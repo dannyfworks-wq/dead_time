@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0A090C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Dead Time</title>
+<style>
+:root{
+  --void:#0A090C; --card:#151319; --raise:#1F1C24; --bone:#EDE6D6;
+  --muted:#8A8194; --amber:#F5A623; --crimson:#C2183C; --hair:#332E3C;
+  --display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;height:100%;overscroll-behavior:none;}
+body{background:var(--void);color:var(--bone);font-family:var(--display);font-size:17px;line-height:1.45;-webkit-font-smoothing:antialiased;}
+button{font-family:inherit;font-size:inherit;color:inherit;border:0;background:none;cursor:pointer;}
+input{font-family:inherit;font-size:16px;color:inherit;}
+
+#app{display:flex;flex-direction:column;height:100dvh;}
+#scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px 28px;}
+
+#board{padding:calc(env(safe-area-inset-top,0px) + 12px) 16px 14px;border-bottom:1px solid var(--hair);
+  background:linear-gradient(180deg,#100E14,#0A090C);position:sticky;top:0;z-index:20;}
+#score{font-family:var(--mono);font-size:52px;font-weight:700;line-height:.9;letter-spacing:-.045em;
+  text-align:center;color:var(--amber);}
+#slabel{text-align:center;font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:var(--muted);
+  font-weight:800;margin-top:7px;}
+#next{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  font-weight:800;color:var(--muted);margin-top:13px;}
+#nbar{height:5px;border-radius:3px;background:var(--hair);overflow:hidden;margin-top:6px;}
+#nbar i{display:block;height:100%;background:var(--amber);border-radius:3px;transition:width .5s;}
+#pips{display:flex;gap:5px;justify-content:center;margin-top:12px;}
+.pip{width:26px;height:4px;border-radius:2px;background:var(--hair);}
+.pip.on{background:var(--crimson);}
+
+#tabs{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--hair);background:#100E14;
+  padding-bottom:env(safe-area-inset-bottom,0px);position:sticky;bottom:0;z-index:20;}
+#tabs button{padding:13px 2px;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--muted);border-top:2px solid transparent;margin-top:-1px;}
+#tabs button[aria-selected="true"]{color:var(--bone);border-top-color:var(--amber);}
+
+.h{font-size:12px;letter-spacing:.2em;text-transform:uppercase;font-weight:800;color:var(--muted);margin:26px 0 12px;}
+.h:first-child{margin-top:20px;}
+.note{color:var(--muted);font-size:14px;line-height:1.5;}
+
+.deckcard{background:var(--card);border:1px solid var(--hair);border-radius:18px;padding:26px 22px 24px;
+  position:relative;overflow:hidden;margin-top:20px;animation:snap .34s cubic-bezier(.2,1.3,.4,1);}
+.deckcard.hot{border-color:rgba(194,24,60,.75);box-shadow:0 0 0 1px rgba(194,24,60,.2),0 18px 50px -20px rgba(194,24,60,.45);}
+@keyframes snap{from{opacity:0;transform:scale(.93) rotate(-1.2deg);}to{opacity:1;transform:none;}}
+.stamp{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.22em;
+  padding:5px 10px;border:1px solid var(--hair);border-radius:4px;color:var(--muted);margin-bottom:18px;}
+.deckcard.hot .stamp{color:#FF6B85;border-color:rgba(194,24,60,.6);}
+.deckcard h2{font-size:clamp(25px,7.4vw,34px);font-weight:900;letter-spacing:-.035em;line-height:1.06;margin:0 0 14px;text-transform:uppercase;}
+.deckcard p{margin:0;color:#CFC6BC;font-size:17px;line-height:1.5;}
+.worth{margin-top:20px;padding-top:16px;border-top:1px solid var(--hair);display:flex;align-items:baseline;gap:8px;}
+.worth b{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:-.03em;}
+.deckcard.hot .worth b{color:var(--crimson);}
+.worth span{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:800;}
+
+.answer{margin-top:18px;padding:16px;border-radius:12px;background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.4);}
+.answer .al{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--amber);font-weight:800;margin-bottom:6px;}
+.answer .av{font-size:19px;font-weight:700;line-height:1.35;}
+
+#clock{font-family:var(--mono);font-size:76px;font-weight:700;text-align:center;letter-spacing:-.05em;padding:22px 0 6px;line-height:1;}
+#clock.low{color:var(--crimson);}
+
+.btn{display:block;width:100%;min-height:58px;border-radius:13px;background:var(--raise);border:1px solid var(--hair);
+  font-weight:800;letter-spacing:.06em;text-transform:uppercase;font-size:14px;margin-top:10px;padding:16px 14px;
+  text-align:center;transition:transform .08s;}
+.btn:active{transform:scale(.985);}
+.btn.amber{background:var(--amber);color:#160F02;border-color:var(--amber);}
+.btn.crimson{background:var(--crimson);color:#fff;border-color:var(--crimson);}
+.btn.ghost{background:transparent;color:var(--muted);min-height:50px;font-size:12px;}
+.btn.big{min-height:70px;font-size:16px;}
+.btn:focus-visible{outline:3px solid var(--bone);outline-offset:2px;}
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.quad .btn{margin-top:0;}
+
+.row{display:flex;align-items:center;gap:12px;padding:13px 14px;background:var(--card);border:1px solid var(--hair);
+  border-radius:12px;margin-bottom:8px;}
+.row .lbl{flex:1;min-width:0;font-size:16px;font-weight:600;}
+.row .lbl.done{color:var(--muted);text-decoration:line-through;}
+.row .sub{font-size:12px;color:var(--muted);font-weight:600;margin-top:2px;}
+.row input{flex:1;min-width:0;background:transparent;border:0;border-bottom:1px solid var(--hair);padding:8px 0;color:var(--bone);font-weight:600;}
+.row input:focus{outline:none;border-bottom-color:var(--amber);}
+.row .cap{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:800;width:74px;flex:none;}
+.chip{min-width:58px;height:46px;padding:0 12px;border-radius:11px;border:1px solid var(--hair);font-family:var(--mono);
+  font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;color:var(--muted);flex:none;}
+.chip.on{background:var(--amber);color:#160F02;border-color:var(--amber);}
+.chip.no{border-color:rgba(194,24,60,.5);color:#FF6B85;}
+
+.tier{border:1px solid var(--hair);border-radius:14px;padding:18px;margin-bottom:12px;background:var(--card);position:relative;}
+.tier.hit{border-color:var(--amber);}
+.tier .tn{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:800;}
+.tier .tv{font-family:var(--mono);font-size:26px;font-weight:700;margin:4px 0 10px;letter-spacing:-.02em;}
+.tier.hit .tv{color:var(--amber);}
+.tier .tease{font-size:17px;font-style:italic;line-height:1.4;color:#CFC6BC;margin-bottom:12px;}
+.tier .pz{font-size:16px;line-height:1.4;font-weight:700;}
+.tier .pz.locked{filter:blur(9px);user-select:none;pointer-events:none;opacity:.6;}
+.bar{height:6px;border-radius:3px;background:var(--hair);overflow:hidden;margin-top:14px;}
+.bar i{display:block;height:100%;background:var(--amber);border-radius:3px;transition:width .5s;}
+.lock{position:absolute;top:16px;right:16px;font-size:11px;letter-spacing:.14em;color:var(--muted);font-weight:800;}
+.tier.hit .lock{color:var(--amber);}
+
+.tot{text-align:center;padding:26px 0 14px;}
+.tot .n{font-family:var(--mono);font-size:72px;font-weight:700;line-height:.9;letter-spacing:-.045em;color:var(--amber);}
+.tot .l{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-top:10px;}
+
+.hand{display:flex;gap:8px;flex-wrap:wrap;}
+.held{padding:11px 13px;border-radius:10px;border:1px dashed var(--hair);font-size:12px;font-weight:800;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--bone);}
+
+.split{display:flex;gap:10px;align-items:center;margin-bottom:10px;}
+.split .cap{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:800;flex:1;}
+.split input{width:96px;background:var(--card);border:1px solid var(--hair);border-radius:9px;padding:12px;
+  text-align:center;font-family:var(--mono);font-weight:700;}
+
+.streak{display:inline-block;padding:6px 11px;border-radius:20px;background:rgba(245,166,35,.14);
+  border:1px solid rgba(245,166,35,.45);color:var(--amber);font-size:11px;font-weight:800;
+  letter-spacing:.12em;text-transform:uppercase;margin:18px 0 0;}
+
+.pinpad{max-width:280px;margin:36px auto;text-align:center;}
+.pinpad input{width:100%;background:var(--card);border:1px solid var(--hair);border-radius:12px;padding:18px;
+  text-align:center;font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:.4em;}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important;}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="board">
+    <div id="score">0</div>
+    <div id="slabel">Team total</div>
+    <div id="next"><span id="nl">Tier 1</span><span id="nr">250 to go</span></div>
+    <div id="nbar"><i style="width:0%"></i></div>
+    <div id="pips"></div>
+  </div>
+  <div id="scroll"><div id="view"></div></div>
+  <nav id="tabs">
+    <button data-tab="deck" aria-selected="true">Deck</button>
+    <button data-tab="mazes" aria-selected="false">Mazes</button>
+    <button data-tab="nerve" aria-selected="false">Nerve</button>
+    <button data-tab="vault" aria-selected="false">Vault</button>
+    <button data-tab="setup" aria-selected="false">Locked</button>
+  </nav>
+</div>
+
+<script>
+"use strict";
+
+var KEY="dead-time-v3", _mem={};
+var Store={
+  get:function(k){
+    if(window.storage&&window.storage.get)
+      return Promise.resolve(window.storage.get(k)).then(function(r){return r&&r.value!=null?r.value:null;}).catch(function(){return _l(k);});
+    return Promise.resolve(_l(k));
+  },
+  set:function(k,v){
+    if(window.storage&&window.storage.set)
+      return Promise.resolve(window.storage.set(k,v)).catch(function(){_ls(k,v);});
+    _ls(k,v);return Promise.resolve();
+  }
+};
+function _l(k){try{return localStorage.getItem(k);}catch(e){return _mem[k]||null;}}
+function _ls(k,v){try{localStorage.setItem(k,v);}catch(e){_mem[k]=v;}}
+
+/* ============================================================
+   DECK — kinds: reveal | timed | group | wager | dare | item
+   ============================================================ */
+var DECK=[
+
+/* --- TRIVIA --- */
+{c:"TRIVIA",k:"reveal",v:10,t:"The Berry",d:"The boysenberry is named after a man. What was his name?",a:"Rudolph Boysen. Walter Knott got six wilted plants off him in 1932 and nursed them back to life."},
+{c:"TRIVIA",k:"reveal",v:15,t:"Three Parents",d:"A boysenberry is a cross of three berries. Name all three.",a:"Blackberry, red raspberry, and loganberry."},
+{c:"TRIVIA",k:"reveal",v:10,t:"First Plates",d:"In 1934 Cordelia Knott started serving fried chicken dinners. What did she serve them on?",a:"Her own wedding china. That\u2019s how the Chicken Dinner Restaurant started."},
+{c:"TRIVIA",k:"reveal",v:15,t:"Standing In History",d:"The Calico Mine Ride invented something in 1960 that you are literally standing inside right now. What?",a:"The hidden switchback queue. Every line you wait in tonight is its fault."},
+{c:"TRIVIA",k:"reveal",v:15,t:"Got His Start",d:"A very famous comedian started out working at Knott\u2019s Bird Cage Theatre. Who?",a:"Steve Martin."},
+{c:"TRIVIA",k:"reveal",v:15,t:"The Real One",d:"Walter Knott bought an actual abandoned California ghost town in 1951. What was it called?",a:"Calico. He later donated it to San Bernardino County."},
+{c:"TRIVIA",k:"reveal",v:15,t:"Before the Rides",d:"Ghost Town or roller coasters \u2014 which came first, and what year?",a:"Ghost Town, 1940. Walter built it as a tribute to pioneers, inspired by his mother crossing in a covered wagon."},
+{c:"TRIVIA",k:"reveal",v:10,t:"The Statues",d:"Those concrete people sitting on benches around Ghost Town \u2014 who made them?",a:"Claude Bell, park artist from 1947 to 1986. They were modeled on real people."},
+
+/* --- CLOSEST --- */
+{c:"CLOSEST",k:"reveal",v:15,t:"First Fright",d:"What year did Knott\u2019s Scary Farm happen for the very first time?",a:"1973. This is the 53rd season."},
+{c:"CLOSEST",k:"reveal",v:10,t:"Price of Entry",d:"1968 was the first year Knott\u2019s charged admission at all. How much?",a:"One dollar."},
+{c:"CLOSEST",k:"reveal",v:15,t:"How Fast",d:"Top speed of GhostRider, in miles per hour.",a:"56 mph."},
+{c:"CLOSEST",k:"reveal",v:20,t:"The Payroll",d:"How many monsters are working the park tonight?",a:"More than a thousand."},
+{c:"CLOSEST",k:"reveal",v:10,t:"The Count",d:"How many mazes are running this season? How many scare zones? Both right or nothing.",a:"Ten mazes, five scare zones, three shows."},
+
+/* --- RAPID --- */
+{c:"RAPID",k:"timed",v:25,secs:45,t:"Name Ten",d:"Ten horror movies between the two of you. Forty-five seconds. No repeats.",a:""},
+{c:"RAPID",k:"timed",v:25,secs:45,t:"Final Girls",d:"Eight horror movie final girls. Trade off, no hesitating.",a:""},
+{c:"RAPID",k:"timed",v:20,secs:30,t:"Berry Menu",d:"Thirty seconds. Six things sold here with boysenberry in them.",a:""},
+{c:"RAPID",k:"timed",v:25,secs:45,t:"Body Count",d:"Fifteen rides in this park. Forty-five seconds. Go.",a:""},
+{c:"RAPID",k:"timed",v:25,secs:45,t:"Slashers",d:"Ten horror villains, trading off. Either of you stalls, it\u2019s over.",a:""},
+{c:"RAPID",k:"timed",v:20,secs:30,t:"Bad Ideas",d:"Thirty seconds. Eight things people in horror movies do that get them killed.",a:""},
+{c:"RAPID",k:"timed",v:30,secs:60,t:"A to Z",d:"Sixty seconds. Something scary for every letter, A forward, trading off. Get to M.",a:""},
+{c:"RAPID",k:"timed",v:20,secs:60,t:"Line Census",d:"Sixty seconds. Agree on how many people are ahead of you. Within ten of the real count.",a:""},
+
+/* --- COUPLES --- */
+{c:"COUPLES",k:"group",v:20,t:"First Impression",d:"Each of you guesses what your guy was actually thinking the first time you met. Both right or nothing.",a:""},
+{c:"COUPLES",k:"group",v:20,t:"Worst Fear",d:"Each of you name the thing in this park your partner is most afraid of. Both have to land it.",a:""},
+{c:"COUPLES",k:"group",v:15,t:"Order For Them",d:"Guess exactly what your partner would order off the next food cart you pass. They rule on it.",a:""},
+{c:"COUPLES",k:"group",v:25,t:"The Story",d:"Both couples tell the story of their first date. If each couple\u2019s two versions match, it counts.",a:""},
+{c:"COUPLES",k:"group",v:20,t:"Screen Time",d:"Name the last thing your partner watched without you. Phones out to verify.",a:""},
+{c:"COUPLES",k:"group",v:20,t:"The Tell",d:"Describe what your partner does right before they get scared. They have to admit whether it\u2019s true.",a:""},
+{c:"COUPLES",k:"group",v:25,t:"Number In Your Head",d:"Both guys secretly pick 1\u201310 for how scared they are right now. Guess your guy\u2019s number within two.",a:""},
+{c:"COUPLES",k:"group",v:20,t:"Would They",d:"Would your partner walk the next maze alone for $500? Call it, then they answer.",a:""},
+{c:"COUPLES",k:"group",v:15,t:"Song One",d:"Name your partner\u2019s most-played song. Check the phone. No arguing with the data.",a:""},
+{c:"COUPLES",k:"group",v:30,t:"Two Truths",d:"Each of you tells two truths and a lie. Your guy has to catch the lie. Both caught or nothing.",a:""},
+{c:"COUPLES",k:"group",v:20,t:"Same Answer",d:"You and your guy get asked the same question out of earshot. Both couples match, it counts.",a:""},
+
+/* --- QUEUE --- */
+{c:"QUEUE",k:"dare",v:20,t:"Slow Dance",d:"Slow dance with your partner right here. No music, full song length, no laughing it off.",a:""},
+{c:"QUEUE",k:"dare",v:25,t:"Say It Loud",d:"Tell the people around you one specific reason you love your partner. Out loud, no mumbling.",a:""},
+{c:"QUEUE",k:"dare",v:30,t:"Ask Again",d:"Re-propose to your partner, right here in this line, in front of everybody.",a:""},
+{c:"QUEUE",k:"dare",v:25,t:"Eight Bars",d:"Sing eight bars of your song to your partner. Audibly.",a:""},
+{c:"QUEUE",k:"dare",v:20,t:"Recreate It",d:"Recreate your wedding photo pose right where you\u2019re standing. Somebody takes it.",a:""},
+{c:"QUEUE",k:"dare",v:15,t:"Trade Jackets",d:"Swap jackets with your partner for the rest of the night. No takebacks.",a:""},
+{c:"QUEUE",k:"dare",v:20,t:"First Date",d:"Reenact one specific moment from your first date. The other couple has to guess what it was.",a:""},
+{c:"QUEUE",k:"dare",v:15,t:"Feed Them",d:"Next thing either of you eats, you feed each other the first bite. In public.",a:""},
+{c:"QUEUE",k:"dare",v:25,t:"Carry Me",d:"Piggyback ride from where you are now to the front of this line.",a:""},
+{c:"QUEUE",k:"dare",v:20,t:"Three Things",d:"Tell your partner three things you\u2019ve never told them. Real ones.",a:""},
+{c:"QUEUE",k:"dare",v:25,t:"Ask the Line",d:"Get a stranger to guess how long you two have been together. Within a year and it counts.",a:""},
+{c:"QUEUE",k:"dare",v:15,t:"Recruit",d:"Get the group behind you to answer one trivia question with you. They have to actually try.",a:""},
+{c:"QUEUE",k:"dare",v:15,t:"Line Intel",d:"Find out from a stranger in this line which maze is the scariest one this year.",a:""},
+{c:"QUEUE",k:"dare",v:10,t:"Name Drop",d:"Learn the first name of somebody waiting near you. Use it in a sentence.",a:""},
+{c:"QUEUE",k:"dare",v:25,t:"Hype Man",d:"Convince the group behind you this is the best maze in the park. Make them believe it.",a:""},
+{c:"QUEUE",k:"dare",v:15,t:"Free Advice",d:"Give a total stranger one genuinely useful piece of advice for tonight.",a:""},
+{c:"QUEUE",k:"dare",v:15,t:"The Poll",d:"Ask three people in line what scares them most. Report back to the group.",a:""},
+{c:"QUEUE",k:"dare",v:15,t:"Photo Duty",d:"Offer to take a photo for a group of strangers. Take a good one.",a:""},
+{c:"QUEUE",k:"dare",v:20,t:"Recommendation",d:"Get a stranger to name their favorite thing they\u2019ve eaten here tonight. Then go eat it later.",a:""},
+{c:"QUEUE",k:"dare",v:20,t:"Impression",d:"Do an impression of the monster who got you worst so far. The other three have to guess which one.",a:""},
+{c:"QUEUE",k:"dare",v:25,t:"The Pitch",d:"Pitch a brand-new maze concept in thirty seconds. Needs three yeses.",a:""},
+{c:"QUEUE",k:"dare",v:10,t:"Compliment Duty",d:"Give a sincere, specific compliment to somebody in line. Generic doesn\u2019t count.",a:""},
+{c:"QUEUE",k:"dare",v:20,t:"Four Way",d:"Convince the people around you that one of the four of you works here.",a:""},
+
+
+/* --- PAIR UP: who walks the next maze with who --- */
+{c:"PAIR UP",k:"group",v:30,t:"Swap",d:"Next maze: {g1} with {p1}, {p2} with {g2}. Original couples don\u2019t talk until the exit.",a:""},
+{c:"PAIR UP",k:"group",v:25,t:"Girls Only",d:"{p1} and {p2} walk the next maze alone together. {g1} and {g2} wait at the exit and watch you come out.",a:""},
+{c:"PAIR UP",k:"group",v:25,t:"Guys Only",d:"Send {g1} and {g2} in alone. You two wait at the exit and rate their faces out of ten.",a:""},
+{c:"PAIR UP",k:"group",v:35,t:"Blind Date",d:"Swap partners for this line. Before you reach the front, learn three things about each other you didn\u2019t know.",a:""},
+{c:"PAIR UP",k:"group",v:30,t:"Split the Party",d:"Two pairs, separate entries. Meet at the exit. If both pairs name the same worst room, it counts.",a:""},
+{c:"PAIR UP",k:"group",v:20,t:"Trade Phones",d:"Swap phones with the other couple for one full maze. No peeking, no deleting.",a:""},
+{c:"PAIR UP",k:"group",v:35,t:"Bodyguard",d:"Swapped pairs. {g1} and {g2} swap \u2014 each one\u2019s only job is keeping the other\u2019s partner from screaming. Nobody screams, it counts.",a:""},
+{c:"PAIR UP",k:"group",v:25,t:"Reunion",d:"After a swap maze, each of you tells your own partner one genuinely nice thing the other person said about them.",a:""},
+{c:"PAIR UP",k:"group",v:30,t:"The Interview",d:"Swap partners. Each of you gets one question you\u2019ve always wanted to ask the other couple. They have to answer.",a:""},
+{c:"PAIR UP",k:"group",v:20,t:"Four Abreast",d:"All four of you walk the next maze in one row, arms linked. Anybody breaks the chain, it\u2019s dead.",a:""},
+
+/* --- WAGERS --- */
+{c:"WAGER",k:"wager",v:25,t:"Called Shot",d:"Call right now what will scare you worst in this maze. Settle it on the way out.",a:""},
+{c:"WAGER",k:"wager",v:20,t:"First Blood",d:"Call which of the four of you screams first in there. Settle after.",a:""},
+{c:"WAGER",k:"wager",v:30,t:"Silent Run",d:"Bet you get through this maze without a single audible sound.",a:""},
+{c:"WAGER",k:"wager",v:25,t:"Hands Down",d:"Bet you get through without grabbing anybody.",a:""},
+{c:"WAGER",k:"wager",v:20,t:"Over Under",d:"Call how many jump scares get you in there. Within two and it pays.",a:""},
+{c:"WAGER",k:"wager",v:30,t:"Point Position",d:"Bet you walk this entire maze in front.",a:""},
+{c:"WAGER",k:"wager",v:25,t:"Eye Contact",d:"Bet you make deliberate eye contact with three separate monsters in there.",a:""},
+{c:"WAGER",k:"wager",v:20,t:"Favorite Room",d:"Call your favorite room before you go in. Say afterward whether it held up.",a:""},
+{c:"WAGER",k:"wager",v:30,t:"The Thank You",d:"Bet you thank a monster out loud, to their face, before you exit.",a:""},
+{c:"WAGER",k:"wager",v:35,t:"Nobody Breaks",d:"Bet the two of you get through this one without losing a composure token.",a:""},
+
+/* --- NERVE --- */
+{c:"NERVE",k:"dare",v:35,t:"Point",d:"You lead this maze. First in, all the way through, nobody to hide behind.",a:""},
+{c:"NERVE",k:"dare",v:35,t:"Trail",d:"You go last. Nothing behind you but whatever\u2019s back there.",a:""},
+{c:"NERVE",k:"dare",v:45,t:"Solo",d:"Walk this maze alone. Ahead of the group, out of sight, the whole way.",a:""},
+{c:"NERVE",k:"dare",v:30,t:"Volunteer",d:"If anything in there asks for a volunteer, it\u2019s you. No hesitating.",a:""},
+{c:"NERVE",k:"dare",v:35,t:"Eyes Up",d:"Whole maze, eyes open, looking directly at everything. No floor-staring.",a:""},
+{c:"NERVE",k:"dare",v:30,t:"Redirect",d:"Ask a monster in there to go after your partner instead of you. Then watch it happen.",a:""},
+{c:"NERVE",k:"dare",v:45,t:"Encore",d:"Whatever\u2019s scared you worst tonight \u2014 back in that line right after this one.",a:""},
+{c:"NERVE",k:"dare",v:40,t:"Chain Gang",d:"You two lead the maze holding hands the whole way. Either one lets go, it\u2019s dead.",a:""},
+
+/* --- HEAD TO HEAD: sporty, queue-safe, points still go to the pot --- */
+{c:"HEAD TO HEAD",k:"duel",v:25,t:"Break Him",d:"{p1} works on {g1}, {p2} works on {g2}, same time. First one to make him laugh takes it.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:30,t:"Break His",d:"Swap targets \u2014 {p1} on {g2}, {p2} on {g1}. First one to crack him takes it.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:25,t:"Poker Face",d:"{g1} and {g2} get ninety seconds to crack you both. Whoever holds out longer wins.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:20,t:"Compliment War",d:"Alternate compliments about each other. First one to stall or repeat loses.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:25,t:"The Roast",d:"Thirty seconds each roasting the other woman\u2019s husband. He picks who did it better.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:25,t:"Worst Pickup Line",d:"Deliver a pickup line to your own guy. The other couple picks a winner.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:20,t:"Dance Break",d:"No music, right here in line. Whoever gets more strangers looking wins.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:25,t:"Sell Him",d:"Sixty seconds each pitching your husband to a stranger like a used car. Stranger picks.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:20,t:"Fake Argument",d:"Start a loud fake argument with your guy. Whoever gets more concerned looks wins.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:30,t:"Guess the Year",d:"The guys name a random photo on their phone. First to name the year it was taken wins.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:20,t:"Thumb War",d:"Best of three. Loser buys the next churro.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:20,t:"Don\u2019t Blink",d:"Staring contest. First one to blink loses it.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:15,t:"First to Three",d:"Rock paper scissors. First to three wins.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:25,t:"One Foot",d:"Both up on one foot. First to put it down loses. No leaning on the railing.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:25,t:"Backwards",d:"Alphabet backwards, out loud. Fastest clean run takes it.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:20,t:"Hold It",d:"Both hold your breath. Last one breathing wins.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:20,t:"Wait Time",d:"Both call how many minutes until you\u2019re inside. Closest to the real number takes it.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:25,t:"Arm Wrestle",d:"Railing, ledge, whatever\u2019s there. Best of one.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:25,t:"Best Impression",d:"Both do the same monster. The guys pick a winner, no appeals.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:20,t:"Name More",d:"The guys pick a category. Trade off naming things. First to blank loses.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:30,t:"Straight Face",d:"The guys have two minutes to make you laugh. Whoever holds out longer takes it.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:20,t:"Balance the Cup",d:"Balance a drink on the back of your hand. Longest hold wins.",a:""},
+
+/* --- ITEMS --- */
+{c:"ITEM",k:"item",v:0,t:"Immunity",d:"Cancels one composure loss, whenever you decide to use it.",a:""},
+{c:"ITEM",k:"item",v:0,t:"Veto",d:"Kill one card nobody wants to do. No penalty, streak survives.",a:""},
+{c:"ITEM",k:"item",v:0,t:"Double or Nothing",d:"The next card pays double. Blow it and it costs double.",a:""},
+{c:"ITEM",k:"item",v:0,t:"Insurance",d:"The next card you blow costs the team nothing.",a:""}
+];
+
+var DEFAULT_MAZES=["Origins: The Curse of Calico","The Depths","Dark Entities","Pumpkin Eater","Wax Works",
+"Room 13","The Chilling Chambers","Trick or Treat","New for 2026 \u2014 Mystery Lodge","New for 2026 \u2014 Xcelerator"];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+var S, unlocked=false, tickHandle=null;
+function fresh(){
+  return {
+    tab:"deck",
+    players:["Crystal","Katie"],
+    guys:["Danny","Thomas"],
+    pot:0, credit:[0,0],
+    tokens:6, tokenBonus:15,
+    streak:0, best:0, streakBonus:30,
+    hand:[], dbl:false, ins:false,
+    pending:[],
+    mazes:DEFAULT_MAZES.map(function(m){return {name:m,done:false};}),
+    mazeWorth:15, clearBonus:75,
+    order:[], idx:0, current:null, ended:false, pin:"",
+    tiers:[
+      {at:250, tease:"Something to take the edge off.", prize:"Set this in Setup."},
+      {at:500, tease:"Don\u2019t open this one in the elevator.", prize:"Set this in Setup."},
+      {at:800, tease:"Hang the Do Not Disturb sign first.", prize:"Set this in Setup."}
+    ]
+  };
+}
+function shuffle(n){var a=[],i,j,t;for(i=0;i<n;i++)a.push(i);
+  for(i=a.length-1;i>0;i--){j=Math.floor(Math.random()*(i+1));t=a[i];a[i]=a[j];a[j]=t;}return a;}
+var st=null;
+function save(){clearTimeout(st);st=setTimeout(function(){Store.set(KEY,JSON.stringify(S));},250);}
+
+function mazeCount(){var n=0;S.mazes.forEach(function(m){if(m.done)n++;});return n;}
+function mazePts(){var n=mazeCount(),p=n*S.mazeWorth;if(n===S.mazes.length&&n>0)p+=S.clearBonus;return p;}
+function tokenPts(){return S.tokens*S.tokenBonus;}
+function total(){return S.pot+mazePts()+tokenPts();}
+function sub(x){
+  return String(x)
+    .replace(/\{p1\}/g,S.players[0]).replace(/\{p2\}/g,S.players[1])
+    .replace(/\{g1\}/g,S.guys[0]).replace(/\{g2\}/g,S.guys[1]);
+}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+var view=document.getElementById("view");
+
+function board(){
+  var tot=total(),nx=null,k;
+  document.getElementById("score").textContent=tot;
+  for(k=0;k<S.tiers.length;k++){if(tot<S.tiers[k].at){nx=k;break;}}
+  var nl=document.getElementById("nl"),nr=document.getElementById("nr"),bar=document.querySelector("#nbar i");
+  if(nx===null){nl.textContent="All three tiers cleared";nr.textContent="\u2713";bar.style.width="100%";}
+  else{
+    var prev=nx===0?0:S.tiers[nx-1].at;
+    nl.textContent="Next \u00B7 Tier "+(nx+1);
+    nr.textContent=(S.tiers[nx].at-tot)+" to go";
+    bar.style.width=Math.max(0,Math.min(100,Math.round((tot-prev)/Math.max(1,S.tiers[nx].at-prev)*100)))+"%";
+  }
+  var h="";for(var i=0;i<6;i++)h+='<div class="pip'+(i<S.tokens?" on":"")+'"></div>';
+  document.getElementById("pips").innerHTML=h;
+}
+function render(){
+  board();
+  document.querySelectorAll("#tabs button").forEach(function(b){
+    b.setAttribute("aria-selected",b.dataset.tab===S.tab?"true":"false");
+  });
+  ({deck:vDeck,mazes:vMazes,nerve:vNerve,vault:vVault,setup:vSetup})[S.tab]();
+  document.getElementById("scroll").scrollTop=0;
+}
+function who(action,label){
+  var h='<div class="h">'+label+'</div><div class="quad">';
+  S.players.forEach(function(p,i){
+    h+='<button class="btn amber" data-a="'+action+'" data-i="'+i+'">'+esc(p)+'</button>';
+  });
+  return h+'</div>';
+}
+
+/* ---------- DECK ---------- */
+function vDeck(){
+  var h="",cur=S.current;
+
+  if(!cur){
+    if(S.streak>0)h+='<div class="streak">'+S.streak+' clean in a row</div>';
+    h+='<div class="h">'+(S.order.length-S.idx)+' cards left</div>';
+    h+='<button class="btn amber big" data-a="draw">Draw a card</button>';
+    if(S.idx>0)h+='<button class="btn ghost" data-a="reshuffle">Reshuffle the deck</button>';
+    h+=pendingHTML()+handHTML();
+    h+='<div class="h">How it works</div><p class="note">Two players, one score. Everything either of them earns goes in the same pot, and the pot is the only thing that opens the vault. Blowing a card costs the team half its value \u2014 so think before somebody commits. Every third clean card in a row is worth an extra '+S.streakBonus+'.</p>';
+    view.innerHTML=h;return;
+  }
+
+  var c=cur.card,hot=(c.c==="NERVE"),m=S.dbl?2:1;
+  h+='<div class="deckcard'+(hot?" hot":"")+'"><div class="stamp">'+c.c+'</div>';
+  h+='<h2>'+esc(c.t)+'</h2><p>'+esc(sub(c.d))+'</p>';
+  if(c.v>0)h+='<div class="worth"><b>'+(c.v*m)+'</b><span>points'+(m===2?" \u00B7 doubled":"")+'</span></div>';
+  if(cur.revealed&&c.a)h+='<div class="answer"><div class="al">Answer</div><div class="av">'+esc(c.a)+'</div></div>';
+  h+='</div>';
+
+  if(c.k==="reveal"){
+    if(!cur.revealed){
+      h+='<button class="btn amber big" data-a="reveal">Reveal the answer</button>';
+      h+=vetoBtn()+'<button class="btn ghost" data-a="skip">Skip \u00B7 breaks the streak</button>';
+    }else{
+      h+='<button class="btn amber big" data-a="hit">Got it \u00B7 +'+(c.v*m)+'</button>';
+      h+='<button class="btn crimson" data-a="miss">Missed it \u00B7 \u2212'+Math.round(c.v*m/2)+'</button>';
+    }
+  }
+  else if(c.k==="timed"){
+    if(!cur.endsAt){
+      h+='<button class="btn amber big" data-a="start">Start the '+c.secs+'-second clock</button>';
+      h+=vetoBtn()+'<button class="btn ghost" data-a="skip">Skip \u00B7 breaks the streak</button>';
+    }else{
+      h+='<div id="clock">'+fmt(Math.max(0,Math.ceil((cur.endsAt-Date.now())/1000)))+'</div>';
+      h+='<button class="btn amber big" data-a="hit">Made it \u00B7 +'+(c.v*m)+'</button>';
+      h+='<button class="btn crimson" data-a="miss">Came up short \u00B7 \u2212'+Math.round(c.v*m/2)+'</button>';
+      h+='<button class="btn ghost" data-a="restart">Run the clock again</button>';
+    }
+  }
+  else if(c.k==="group"){
+    h+='<button class="btn amber big" data-a="hit">Nailed it \u00B7 +'+(c.v*m)+'</button>';
+    h+='<button class="btn crimson" data-a="miss">Didn\u2019t land it \u00B7 \u2212'+Math.round(c.v*m/2)+'</button>';
+    h+=vetoBtn();
+  }
+  else if(c.k==="duel"){
+    h+='<div class="h">Who took it</div><div class="quad">';
+    S.players.forEach(function(p,i){
+      h+='<button class="btn amber" data-a="duelwin" data-i="'+i+'">'+esc(p)+'</button>';
+    });
+    h+='</div>';
+    h+='<button class="btn" data-a="hit">Dead tie \u00B7 +'+(c.v*m)+'</button>';
+    h+=vetoBtn()+'<button class="btn crimson" data-a="miss">Neither got there \u00B7 \u2212'+Math.round(c.v*m/2)+'</button>';
+  }
+  else if(c.k==="wager"){
+    h+=who("bet","Who\u2019s calling it");
+    h+='<button class="btn" data-a="betall">Both of them are in</button>';
+    h+=vetoBtn()+'<button class="btn ghost" data-a="skip">Nobody\u2019s betting</button>';
+  }
+  else if(c.k==="item"){
+    h+=who("item","Who holds it");
+    h+='<button class="btn ghost" data-a="skip">Discard it</button>';
+  }
+  else{
+    if(cur.who===null){
+      h+=who("assign","Who\u2019s taking it");
+      h+='<button class="btn" data-a="assignboth">Both of them \u00B7 +'+Math.round(c.v*m*1.5)+'</button>';
+      h+=vetoBtn()+'<button class="btn ghost" data-a="skip">Skip \u00B7 breaks the streak</button>';
+    }else{
+      h+='<div class="h">'+esc(S.players[cur.who])+'</div>';
+      h+='<button class="btn amber big" data-a="hit">Did it \u00B7 +'+(c.v*m)+'</button>';
+      h+='<button class="btn crimson" data-a="miss">Backed out \u00B7 \u2212'+Math.round(c.v*m/2)+'</button>';
+      h+='<button class="btn ghost" data-a="unassign">Somebody else takes it</button>';
+    }
+  }
+  view.innerHTML=h;
+  if(c.k==="timed"&&cur.endsAt)startTick();
+}
+function vetoBtn(){
+  return S.hand.indexOf("Veto")>=0?'<button class="btn" data-a="veto">Burn the Veto \u00B7 no penalty</button>':"";
+}
+function fmt(s){var m=Math.floor(s/60),r=s%60;return m+":"+(r<10?"0":"")+r;}
+function startTick(){
+  clearInterval(tickHandle);
+  tickHandle=setInterval(function(){
+    var el=document.getElementById("clock");
+    if(!el||!S.current||!S.current.endsAt){clearInterval(tickHandle);return;}
+    var left=Math.max(0,Math.ceil((S.current.endsAt-Date.now())/1000));
+    el.textContent=fmt(left);el.className=left<=10?"low":"";
+    if(left===0)clearInterval(tickHandle);
+  },250);
+}
+function pendingHTML(){
+  if(!S.pending.length)return"";
+  var h='<div class="h">Open bets \u00B7 settle after the maze</div>';
+  S.pending.forEach(function(p,k){
+    h+='<div class="row"><div><div class="lbl">'+esc(p.t)+'</div><div class="sub">'+esc(S.players[p.i])+' \u00B7 '+p.v+' pts</div></div>';
+    h+='<button class="chip on" data-a="paid" data-k="'+k+'">PAID</button>';
+    h+='<button class="chip no" data-a="lost" data-k="'+k+'">BLEW IT</button></div>';
+  });
+  return h;
+}
+function handHTML(){
+  if(!S.hand.length&&!S.dbl&&!S.ins)return"";
+  var h='<div class="h">In hand</div><div class="hand">';
+  if(S.dbl)h+='<div class="held">Double armed</div>';
+  if(S.ins)h+='<div class="held">Insured</div>';
+  S.hand.forEach(function(nm,k){h+='<button class="held" data-a="use" data-k="'+k+'">'+esc(nm)+' \u00B7 use</button>';});
+  return h+'</div>';
+}
+
+/* ---------- MAZES ---------- */
+function vMazes(){
+  var h='<div class="h">Passport \u00B7 '+S.mazeWorth+' each, '+S.clearBonus+' if you clear all ten</div>';
+  S.mazes.forEach(function(m,k){
+    h+='<div class="row"><div class="lbl'+(m.done?" done":"")+'">'+esc(m.name)+'</div>';
+    h+='<button class="chip'+(m.done?" on":"")+'" data-a="maze" data-k="'+k+'">'+(m.done?"DONE":"MARK")+'</button></div>';
+  });
+  h+='<div class="h">Standing</div><p class="note">'+mazeCount()+' of '+S.mazes.length+' cleared \u00B7 '+mazePts()+' points</p>';
+  h+='<p class="note" style="margin-top:14px">Knott\u2019s announces the real 2026 lineup on August 18. Rename these in Setup once it drops.</p>';
+  view.innerHTML=h;
+}
+
+/* ---------- NERVE ---------- */
+function vNerve(){
+  var h='<div class="h">Composure \u00B7 '+S.tokens+' of 6 left \u00B7 '+tokenPts()+' pts</div>';
+  h+='<p class="note">Six tokens between the two of them. '+esc(S.guys[0])+' or '+esc(S.guys[1])+' burns one any time somebody screams, grabs, or dead-stops in the middle of a room. Whatever survives is worth '+S.tokenBonus+' points apiece \u2014 real money still on the table at 1 a.m.</p>';
+  h+='<button class="btn crimson big" data-a="burn">Burn a token</button>';
+  h+='<button class="btn" data-a="restore">Give one back</button>';
+  h+='<div class="h">Who\u2019s carrying</div>';
+  S.players.forEach(function(p,i){
+    h+='<div class="row"><div class="lbl">'+esc(p)+'</div><div class="chip'+(S.credit[i]>0?" on":"")+'">'+S.credit[i]+'</div></div>';
+  });
+  h+='<p class="note">Bragging rights only. The pot is the pot.</p>';
+  h+=handHTML();
+  view.innerHTML=h;
+}
+
+/* ---------- VAULT ---------- */
+function vVault(){
+  var tot=total(),h="",cleared=0;
+  S.tiers.forEach(function(t){if(tot>=t.at)cleared++;});
+  if(S.ended){
+    h+='<div class="tot"><div class="n">'+tot+'</div><div class="l">'+
+       (cleared===0?"Nothing unlocked \u2014 brutal":cleared+" of "+S.tiers.length+" unlocked")+'</div></div>';
+  }
+  S.tiers.forEach(function(t,k){
+    var hit=tot>=t.at,pct=Math.min(100,Math.round(tot/Math.max(1,t.at)*100));
+    h+='<div class="tier'+(hit?" hit":"")+'"><div class="tn">Tier '+(k+1)+'</div>';
+    h+='<div class="tv">'+t.at+' points</div>';
+    h+='<div class="tease">\u201C'+esc(t.tease)+'\u201D</div>';
+    h+='<div class="pz'+((S.ended&&hit)?"":" locked")+'">'+esc(t.prize)+'</div>';
+    h+='<div class="lock">'+(S.ended&&hit?"YOURS":(hit?"EARNED":"LOCKED"))+'</div>';
+    h+='<div class="bar"><i style="width:'+pct+'%"></i></div></div>';
+  });
+  h+='<div class="h">Breakdown</div>';
+  h+='<p class="note">Cards '+S.pot+' \u00B7 mazes '+mazePts()+' \u00B7 composure '+tokenPts()+
+     ' \u00B7 best streak '+S.best+' \u00B7 <b style="color:var(--bone)">total '+tot+'</b></p>';
+  h+='<p class="note" style="margin-top:10px">Tiers stack. Clear all three and everything in that room is yours.</p>';
+  h+=S.ended?'<button class="btn ghost" data-a="reopen">Reopen the night</button>'
+            :'<button class="btn amber big" data-a="end">Back at the room \u00B7 open the vault</button>';
+  view.innerHTML=h;
+}
+
+/* ---------- SETUP ---------- */
+function vSetup(){
+  if(!S.pin){
+    view.innerHTML='<div class="h">Lock this down</div>'+
+      '<p class="note">This phone is getting passed around all night. Set a four-digit code so nobody wanders in here and reads the prizes.</p>'+
+      '<div class="pinpad"><input id="newpin" inputmode="numeric" maxlength="4" placeholder="0000"></div>'+
+      '<button class="btn amber big" data-a="setpin">Set the code</button>'+
+      '<p class="note" style="margin-top:14px">Write it down. There\u2019s no recovery \u2014 forgetting it means clearing site data and starting over.</p>';
+    return;
+  }
+  if(!unlocked){
+    view.innerHTML='<div class="h">Locked</div>'+
+      '<div class="pinpad"><input id="pinin" inputmode="numeric" maxlength="4" placeholder="\u2022\u2022\u2022\u2022"></div>'+
+      '<button class="btn amber big" data-a="unlock">Unlock</button>';
+    return;
+  }
+  var h='<div class="h">The players</div>';
+  S.players.forEach(function(p,i){
+    h+='<div class="row"><div class="cap">'+["One","Two"][i]+'</div><input data-f="player" data-i="'+i+'" value="'+esc(p)+'"></div>';
+  });
+  h+='<div class="h">The crew \u00B7 judges and hecklers</div>';
+  S.guys.forEach(function(p,i){
+    h+='<div class="row"><div class="cap">'+["One","Two"][i]+'</div><input data-f="guy" data-i="'+i+'" value="'+esc(p)+'"></div>';
+  });
+  h+='<div class="h">The vault</div><p class="note">The taunt shows all night. The prize stays blurred until you end the night.</p>';
+  S.tiers.forEach(function(t,k){
+    h+='<div class="split"><div class="cap">Tier '+(k+1)+' at</div><input data-f="tierat" data-k="'+k+'" inputmode="numeric" value="'+t.at+'"></div>';
+    h+='<div class="row"><div class="cap">Taunt</div><input data-f="tease" data-k="'+k+'" value="'+esc(t.tease)+'"></div>';
+    h+='<div class="row"><div class="cap">Prize</div><input data-f="prize" data-k="'+k+'" value="'+esc(t.prize)+'"></div>';
+  });
+  h+='<div class="h">Maze list</div>';
+  S.mazes.forEach(function(m,k){h+='<div class="row"><input data-f="maze" data-k="'+k+'" value="'+esc(m.name)+'"></div>';});
+  h+='<div class="h">Point values</div>';
+  h+='<div class="split"><div class="cap">Each maze</div><input data-f="mw" inputmode="numeric" value="'+S.mazeWorth+'"></div>';
+  h+='<div class="split"><div class="cap">Clean sweep</div><input data-f="cb" inputmode="numeric" value="'+S.clearBonus+'"></div>';
+  h+='<div class="split"><div class="cap">Per token left</div><input data-f="tb" inputmode="numeric" value="'+S.tokenBonus+'"></div>';
+  h+='<div class="split"><div class="cap">Streak of 3</div><input data-f="sb" inputmode="numeric" value="'+S.streakBonus+'"></div>';
+  h+='<div class="h">Danger</div>';
+  h+='<button class="btn" data-a="lockup">Lock it back up</button>';
+  h+='<button class="btn crimson" data-a="wipe">Wipe everything</button>';
+  h+='<p class="note" style="margin-top:14px">Saves on this phone as you go. No signal needed, which matters \u2014 you won\u2019t have any.</p>';
+  view.innerHTML=h;
+}
+
+/* ============================================================
+   ACTIONS
+   ============================================================ */
+function draw(){
+  if(S.idx>=S.order.length){S.order=shuffle(DECK.length);S.idx=0;}
+  S.current={card:DECK[S.order[S.idx]],who:null,revealed:false,endsAt:0};
+  S.idx++;save();render();
+}
+function clear(){S.current=null;clearInterval(tickHandle);save();render();}
+function gain(v,i){
+  S.pot+=v;
+  if(typeof i==="number"&&i>=0&&i<S.credit.length)S.credit[i]+=v;
+  S.streak++;
+  if(S.streak>S.best)S.best=S.streak;
+  if(S.streak%3===0)S.pot+=S.streakBonus;
+  S.dbl=false;
+}
+function lose(v){
+  if(S.ins)S.ins=false; else S.pot-=v;
+  S.streak=0;S.dbl=false;
+}
+
+document.addEventListener("click",function(e){
+  var el=e.target.closest("[data-a]");if(!el)return;
+  var a=el.dataset.a,i=+el.dataset.i,k=+el.dataset.k;
+  var cur=S.current,c=cur?cur.card:null,m=S.dbl?2:1;
+
+  if(a==="draw")return draw();
+  if(a==="reshuffle"){S.order=shuffle(DECK.length);S.idx=0;save();return render();}
+  if(a==="skip"){S.streak=0;return clear();}
+  if(a==="veto"){var vi=S.hand.indexOf("Veto");if(vi>=0)S.hand.splice(vi,1);return clear();}
+
+  if(a==="reveal"){cur.revealed=true;save();return render();}
+  if(a==="start"||a==="restart"){cur.endsAt=Date.now()+c.secs*1000;save();return render();}
+
+  if(a==="assign"){cur.who=i;save();return render();}
+  if(a==="unassign"){cur.who=null;save();return render();}
+
+  if(a==="assignboth"){gain(Math.round(c.v*m*1.5),-1);return clear();}
+  if(a==="duelwin"){gain(c.v*m,i);return clear();}
+  if(a==="hit"){gain(c.v*m,cur.who);return clear();}
+  if(a==="miss"){lose(Math.round(c.v*m/2));return clear();}
+
+  if(a==="bet"){S.pending.push({t:c.t,v:c.v*m,i:i});S.dbl=false;return clear();}
+  if(a==="betall"){S.players.forEach(function(p,x){S.pending.push({t:c.t,v:c.v*m,i:x});});S.dbl=false;return clear();}
+  if(a==="paid"){var pd=S.pending[k];gain(pd.v,pd.i);S.pending.splice(k,1);save();return render();}
+  if(a==="lost"){var pl=S.pending[k];lose(Math.round(pl.v/2));S.pending.splice(k,1);save();return render();}
+
+  if(a==="item"){
+    if(c.t==="Double or Nothing")S.dbl=true;
+    else if(c.t==="Insurance")S.ins=true;
+    else S.hand.push(c.t);
+    return clear();
+  }
+  if(a==="use"){
+    var nm=S.hand[k];
+    if(nm==="Immunity"&&S.tokens<6)S.tokens++;
+    S.hand.splice(k,1);save();return render();
+  }
+
+  if(a==="maze"){S.mazes[k].done=!S.mazes[k].done;save();return render();}
+  if(a==="burn"){if(S.tokens>0)S.tokens--;save();return render();}
+  if(a==="restore"){if(S.tokens<6)S.tokens++;save();return render();}
+
+  if(a==="end"){S.ended=true;save();return render();}
+  if(a==="reopen"){S.ended=false;save();return render();}
+
+  if(a==="setpin"){
+    var np=(document.getElementById("newpin").value||"").trim();
+    if(!/^\d{4}$/.test(np)){alert("Four digits.");return;}
+    S.pin=np;unlocked=true;save();return render();
+  }
+  if(a==="unlock"){
+    var uv=(document.getElementById("pinin").value||"").trim();
+    if(uv===S.pin){unlocked=true;return render();}
+    alert("Wrong code.");return;
+  }
+  if(a==="lockup"){unlocked=false;return render();}
+  if(a==="wipe"){
+    if(!confirm("Wipe the score, prizes, names and the code?"))return;
+    S=fresh();S.order=shuffle(DECK.length);unlocked=false;save();return render();
+  }
+});
+
+document.addEventListener("input",function(e){
+  var el=e.target,f=el.dataset.f;if(!f)return;
+  var i=+el.dataset.i,k=+el.dataset.k,v=el.value;
+  if(f==="player")S.players[i]=v;
+  if(f==="guy")S.guys[i]=v;
+  if(f==="tease")S.tiers[k].tease=v;
+  if(f==="prize")S.tiers[k].prize=v;
+  if(f==="tierat"){S.tiers[k].at=Math.max(1,parseInt(v,10)||1);board();}
+  if(f==="maze")S.mazes[k].name=v;
+  if(f==="mw"){S.mazeWorth=Math.max(0,parseInt(v,10)||0);board();}
+  if(f==="cb"){S.clearBonus=Math.max(0,parseInt(v,10)||0);board();}
+  if(f==="tb"){S.tokenBonus=Math.max(0,parseInt(v,10)||0);board();}
+  if(f==="sb")S.streakBonus=Math.max(0,parseInt(v,10)||0);
+  save();
+});
+
+document.getElementById("tabs").addEventListener("click",function(e){
+  var b=e.target.closest("button[data-tab]");if(!b)return;
+  S.tab=b.dataset.tab;
+  if(S.tab!=="setup")unlocked=false;
+  save();render();
+});
+
+Store.get(KEY).then(function(raw){
+  try{S=raw?JSON.parse(raw):fresh();}catch(e){S=fresh();}
+  if(!S||!S.players||!S.mazes)S=fresh();
+  if(!S.pending)S.pending=[];
+  if(!S.guys)S.guys=["Danny","Thomas"];
+  if(!S.credit||S.credit.length!==S.players.length)S.credit=S.players.map(function(){return 0;});
+  if(!S.order||S.order.length!==DECK.length){S.order=shuffle(DECK.length);S.idx=0;}
+  render();
+}).catch(function(){S=fresh();S.order=shuffle(DECK.length);render();});
+</script>
+</body>
+</html>
