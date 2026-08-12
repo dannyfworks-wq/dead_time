@@ -170,7 +170,7 @@ input{font-family:inherit;font-size:16px;color:inherit;}
 <script>
 "use strict";
 
-var KEY="dead-time-v5", _mem={};
+var KEY="dead-time-v6", _mem={};
 var Store={
   get:function(k){
     if(window.storage&&window.storage.get)
@@ -362,6 +362,7 @@ var DEFAULT_MAZES=["Origins: The Curse of Calico","The Depths","Dark Entities","
    STATE
    ============================================================ */
 var S, unlocked=false, tickHandle=null;
+function ALL(){ return (S && S.custom && S.custom.length) ? DECK.concat(S.custom) : DECK; }
 function fresh(){
   return {
     tab:"deck",
@@ -370,15 +371,18 @@ function fresh(){
     pot:0, credit:[0,0],
     tokens:6, tokenBonus:15,
     streak:0, best:0, streakBonus:30,
-    hand:[], dbl:false, ins:false, off:[],
+    hand:[], dbl:false, ins:false, off:[], custom:[],
     pending:[],
     mazes:DEFAULT_MAZES.map(function(m){return {name:m,done:false};}),
     mazeWorth:15, clearBonus:75,
     order:[], idx:0, current:null, ended:false, pin:"",
     tiers:[
-      {at:250, tease:"Something to take the edge off.", prize:"Set this in Setup."},
-      {at:500, tease:"Don\u2019t open this one in the elevator.", prize:"Set this in Setup."},
-      {at:800, tease:"Hang the Do Not Disturb sign first.", prize:"Set this in Setup."}
+      {at:400, tease:"You\u2019re going to want to sit down first.",
+       prize:"The recovery kit. Plush socks, gold under-eye patches, electrolytes and Advil, makeup wipes, hair ties, and boysenberry pie from the park bakery."},
+      {at:750, tease:"You\u2019re not done yet.",
+       prize:"Two 100-piece puzzles. Couples race, first finished picks breakfast."},
+      {at:1100, tease:"Don\u2019t make any plans for tomorrow.",
+       prize:"Korean spa day. All four of us, tomorrow afternoon, already booked."}
     ]
   };
 }
@@ -602,17 +606,18 @@ function vVault(){
 /* ---------- DECK BROWSER ---------- */
 var browsing=false, filter="ALL";
 function cats(){
-  var seen=[],i;
-  for(i=0;i<DECK.length;i++) if(seen.indexOf(DECK[i].c)<0) seen.push(DECK[i].c);
+  var seen=[],A=ALL(),i;
+  for(i=0;i<A.length;i++) if(seen.indexOf(A[i].c)<0) seen.push(A[i].c);
   return seen;
 }
 function vBrowse(){
-  var on=0;DECK.forEach(function(c){if(!isOff(c))on++;});
+  var on=0;ALL().forEach(function(c){if(!isOff(c))on++;});
   var h='<button class="btn" data-a="backsetup">Back to setup</button>';
-  h+='<div class="h">'+on+' of '+DECK.length+' cards switched on</div>';
-  h+='<div class="chips"><button class="fc'+(filter==="ALL"?" on":"")+'" data-a="filter" data-c="ALL">All '+DECK.length+'</button>';
+  h+='<button class="btn amber" data-a="newcard">Write your own card</button>';
+  h+='<div class="h">'+on+' of '+ALL().length+' cards switched on</div>';
+  h+='<div class="chips"><button class="fc'+(filter==="ALL"?" on":"")+'" data-a="filter" data-c="ALL">All '+ALL().length+'</button>';
   cats().forEach(function(c){
-    var n=0;DECK.forEach(function(x){if(x.c===c)n++;});
+    var n=0;ALL().forEach(function(x){if(x.c===c)n++;});
     h+='<button class="fc'+(filter===c?" on":"")+'" data-a="filter" data-c="'+c+'">'+c+' '+n+'</button>';
   });
   h+='</div>';
@@ -621,15 +626,39 @@ function vBrowse(){
     h+='<p class="note" style="user-select:text;-webkit-user-select:text">'+esc(S.off.join(", "))+'</p>';
     h+='<button class="btn ghost" data-a="allon">Switch everything back on</button>';
   }
-  DECK.forEach(function(c,i){
+  ALL().forEach(function(c,i){
     if(filter!=="ALL"&&c.c!==filter)return;
     var off=isOff(c);
     h+='<div class="cr'+(off?" dim":"")+'"><div class="body">';
     h+='<div class="cm">'+c.c+(c.v?' \u00B7 '+c.v+' PTS':'')+'</div>';
     h+='<div class="ct">'+esc(c.t)+'</div>';
     h+='<div class="cd">'+esc(sub(c.d))+'</div></div>';
-    h+='<button class="tg'+(off?"":" on")+'" data-a="toggle" data-i="'+i+'">'+(off?"OFF":"ON")+'</button></div>';
+    h+='<button class="tg'+(off?"":" on")+'" data-a="toggle" data-i="'+i+'">'+(off?"OFF":"ON")+'</button>';
+    if(i>=DECK.length)h+='<button class="tg" data-a="delcard" data-i="'+i+'">DEL</button>';
+    h+='</div>';
   });
+  view.innerHTML=h;
+}
+
+/* ---------- CARD COMPOSER ---------- */
+var composing=false, nk="dare";
+var KINDS=[["dare","One of them does it"],["group","Both of them / everybody"],
+           ["duel","Head to head"],["reveal","Question with an answer"],["timed","Timed round"]];
+function vCompose(){
+  var h='<button class="btn" data-a="backbrowse">Back to the deck</button>';
+  h+='<div class="h">Write a card</div>';
+  h+='<div class="row"><div class="cap">Title</div><input id="nt" placeholder="Carry Me"></div>';
+  h+='<div class="row"><div class="cap">Card</div><input id="nd" placeholder="What they have to do"></div>';
+  h+='<div class="split"><div class="cap">Points</div><input id="nv" inputmode="numeric" value="20"></div>';
+  h+='<div class="h">How it plays</div><div class="chips">';
+  KINDS.forEach(function(k){
+    h+='<button class="fc'+(nk===k[0]?" on":"")+'" data-a="kind" data-c="'+k[0]+'">'+k[1]+'</button>';
+  });
+  h+='</div>';
+  if(nk==="reveal")h+='<div class="row"><div class="cap">Answer</div><input id="na" placeholder="The correct answer"></div>';
+  if(nk==="timed")h+='<div class="split"><div class="cap">Seconds</div><input id="ns" inputmode="numeric" value="45"></div>';
+  h+='<button class="btn amber big" data-a="savecard">Add it to the deck</button>';
+  h+='<p class="note" style="margin-top:14px">Your cards land in a CUSTOM pile and shuffle in with the rest. You can switch them off or delete them any time.</p>';
   view.innerHTML=h;
 }
 
@@ -649,6 +678,7 @@ function vSetup(){
       '<button class="btn amber big" data-a="unlock">Unlock</button>';
     return;
   }
+  if(composing)return vCompose();
   if(browsing)return vBrowse();
   var onN=0;DECK.forEach(function(c){if(!isOff(c))onN++;});
   var h='<div class="h">The deck</div>';
@@ -686,13 +716,13 @@ function vSetup(){
    ============================================================ */
 function isOff(c){return S.off.indexOf(c.t)>=0;}
 function activeLeft(){
-  var n=0;for(var i=S.idx;i<S.order.length;i++){if(!isOff(DECK[S.order[i]]))n++;}
+  var n=0;for(var i=S.idx;i<S.order.length;i++){if(!isOff(ALL()[S.order[i]]))n++;}
   return n;
 }
 function draw(){
-  for(var guard=0;guard<DECK.length*3;guard++){
-    if(S.idx>=S.order.length){S.order=shuffle(DECK.length);S.idx=0;}
-    var c=DECK[S.order[S.idx]];S.idx++;
+  for(var guard=0;guard<ALL().length*3;guard++){
+    if(S.idx>=S.order.length){S.order=shuffle(ALL().length);S.idx=0;}
+    var c=ALL()[S.order[S.idx]];S.idx++;
     if(!isOff(c)){S.current={card:c,who:null,revealed:false,endsAt:0};save();render();return;}
   }
   alert("Every card is switched off. Turn some back on in Setup.");
@@ -718,7 +748,7 @@ document.addEventListener("click",function(e){
   var cur=S.current,c=cur?cur.card:null,m=S.dbl?2:1;
 
   if(a==="draw")return draw();
-  if(a==="reshuffle"){S.order=shuffle(DECK.length);S.idx=0;save();return render();}
+  if(a==="reshuffle"){S.order=shuffle(ALL().length);S.idx=0;save();return render();}
   if(a==="skip"){S.streak=0;return clear();}
   if(a==="veto"){var vi=S.hand.indexOf("Veto");if(vi>=0)S.hand.splice(vi,1);return clear();}
 
@@ -768,18 +798,39 @@ document.addEventListener("click",function(e){
     alert("Wrong code.");return;
   }
   if(a==="allon"){S.off=[];save();return render();}
+  if(a==="newcard"){composing=true;return render();}
+  if(a==="backbrowse"){composing=false;return render();}
+  if(a==="kind"){nk=el.dataset.c;return render();}
+  if(a==="savecard"){
+    var t=(document.getElementById("nt").value||"").trim();
+    var d=(document.getElementById("nd").value||"").trim();
+    if(!t||!d){alert("Needs a title and a card.");return;}
+    var card={c:"CUSTOM",k:nk,t:t,d:d,a:"",
+      v:Math.max(0,parseInt((document.getElementById("nv")||{}).value,10)||0)};
+    if(nk==="reveal")card.a=(document.getElementById("na").value||"").trim();
+    if(nk==="timed")card.secs=Math.max(5,parseInt(document.getElementById("ns").value,10)||45);
+    S.custom.push(card);
+    S.order=shuffle(ALL().length);S.idx=0;
+    composing=false;save();return render();
+  }
+  if(a==="delcard"){
+    if(!confirm("Delete this card?"))return;
+    S.custom.splice(i-DECK.length,1);
+    S.order=shuffle(ALL().length);S.idx=0;
+    save();return render();
+  }
   if(a==="browse"){browsing=true;return render();}
-  if(a==="backsetup"){browsing=false;return render();}
+  if(a==="backsetup"){browsing=false;composing=false;return render();}
   if(a==="filter"){filter=el.dataset.c;return render();}
   if(a==="toggle"){
-    var t=DECK[i].t,x=S.off.indexOf(t);
+    var t=ALL()[i].t,x=S.off.indexOf(t);
     if(x>=0)S.off.splice(x,1); else S.off.push(t);
     save();return render();
   }
-  if(a==="lockup"){unlocked=false;browsing=false;return render();}
+  if(a==="lockup"){unlocked=false;browsing=false;composing=false;return render();}
   if(a==="wipe"){
     if(!confirm("Wipe the score, prizes, names and the code?"))return;
-    S=fresh();S.order=shuffle(DECK.length);unlocked=false;save();return render();
+    S=fresh();S.order=shuffle(ALL().length);unlocked=false;save();return render();
   }
 });
 
@@ -802,7 +853,7 @@ document.addEventListener("input",function(e){
 document.getElementById("tabs").addEventListener("click",function(e){
   var b=e.target.closest("button[data-tab]");if(!b)return;
   S.tab=b.dataset.tab;
-  if(S.tab!=="setup"){unlocked=false;browsing=false;}
+  if(S.tab!=="setup"){unlocked=false;browsing=false;composing=false;}
   save();render();
 });
 
@@ -813,9 +864,10 @@ Store.get(KEY).then(function(raw){
   if(!S.guys)S.guys=["Danny","Thomas"];
   if(!S.off)S.off=[];
   if(!S.credit||S.credit.length!==S.players.length)S.credit=S.players.map(function(){return 0;});
-  if(!S.order||S.order.length!==DECK.length){S.order=shuffle(DECK.length);S.idx=0;}
+  if(!S.custom)S.custom=[];
+  if(!S.order||S.order.length!==ALL().length){S.order=shuffle(ALL().length);S.idx=0;}
   render();
-}).catch(function(){S=fresh();S.order=shuffle(DECK.length);render();});
+}).catch(function(){S=fresh();S.order=shuffle(ALL().length);render();});
 </script>
 </body>
 </html>
