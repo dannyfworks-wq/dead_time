@@ -6,6 +6,11 @@
 <meta name="theme-color" content="#0A090C">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dead Time">
+<meta name="application-name" content="Dead Time">
+<meta name="description" content="A queue game for Knott's Scary Farm.">
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="%230A090C"/><text x="32" y="44" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="900" fill="%23F5A623" text-anchor="middle">DT</text></svg>'>
+<link rel="apple-touch-icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="%230A090C"/><text x="32" y="44" font-family="Helvetica,Arial,sans-serif" font-size="34" font-weight="900" fill="%23F5A623" text-anchor="middle">DT</text></svg>'>
 <title>Dead Time</title>
 <style>
 :root{
@@ -123,6 +128,20 @@ input{font-family:inherit;font-size:16px;color:inherit;}
   border:1px solid rgba(245,166,35,.45);color:var(--amber);font-size:11px;font-weight:800;
   letter-spacing:.12em;text-transform:uppercase;margin:18px 0 0;}
 
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px;}
+.fc{padding:9px 13px;border-radius:20px;border:1px solid var(--hair);background:var(--card);
+  font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+.fc.on{background:var(--amber);color:#160F02;border-color:var(--amber);}
+.cr{display:flex;gap:12px;align-items:flex-start;padding:13px 14px;background:var(--card);
+  border:1px solid var(--hair);border-radius:12px;margin-bottom:8px;}
+.cr.dim{opacity:.4;}
+.cr .body{flex:1;min-width:0;}
+.cr .ct{font-size:15px;font-weight:800;letter-spacing:-.01em;}
+.cr .cm{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--muted);margin-bottom:3px;}
+.cr .cd{font-size:13px;color:var(--muted);line-height:1.4;margin-top:3px;}
+.tg{width:56px;height:40px;flex:none;border-radius:10px;border:1px solid var(--hair);
+  font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted);}
+.tg.on{background:var(--amber);color:#160F02;border-color:var(--amber);}
 .pinpad{max-width:280px;margin:36px auto;text-align:center;}
 .pinpad input{width:100%;background:var(--card);border:1px solid var(--hair);border-radius:12px;padding:18px;
   text-align:center;font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:.4em;}
@@ -151,7 +170,7 @@ input{font-family:inherit;font-size:16px;color:inherit;}
 <script>
 "use strict";
 
-var KEY="dead-time-v3", _mem={};
+var KEY="dead-time-v5", _mem={};
 var Store={
   get:function(k){
     if(window.storage&&window.storage.get)
@@ -190,6 +209,17 @@ var DECK=[
 {c:"CLOSEST",k:"reveal",v:10,t:"The Count",d:"How many mazes are running this season? How many scare zones? Both right or nothing.",a:"Ten mazes, five scare zones, three shows."},
 
 /* --- RAPID --- */
+{c:"RAPID",k:"timed",v:20,secs:30,t:"Not a Ride",d:"Thirty seconds. Ten things in this park that aren\u2019t rides.",a:""},
+{c:"RAPID",k:"timed",v:25,secs:45,t:"Candy Run",d:"Forty-five seconds. Fifteen kinds of Halloween candy, trading off.",a:""},
+{c:"RAPID",k:"timed",v:25,secs:45,t:"Haunted House",d:"Twelve things you\u2019d expect to find in a haunted house. No repeats.",a:""},
+{c:"RAPID",k:"timed",v:20,secs:30,t:"Glow",d:"Thirty seconds. Eight things that glow in the dark.",a:""},
+{c:"RAPID",k:"timed",v:25,secs:45,t:"Purse Check",d:"Forty-five seconds. Name fifteen things actually in your bag right now. Then prove three of them.",a:""},
+{c:"RAPID",k:"timed",v:30,secs:60,t:"Road Trip",d:"Sixty seconds. Every state either of you has set foot in. Twenty or better takes it.",a:""},
+{c:"RAPID",k:"timed",v:25,secs:45,t:"Husband Inventory",d:"Forty-five seconds. Ten things your husbands do that drive you insane. Say them out loud.",a:""},
+{c:"RAPID",k:"timed",v:20,secs:30,t:"Scarier Than This",d:"Thirty seconds. Eight things scarier than standing in this line.",a:""},
+{c:"RAPID",k:"timed",v:25,secs:45,t:"Night Songs",d:"Forty-five seconds. Ten songs with night, dark or moon in the title.",a:""},
+{c:"RAPID",k:"timed",v:25,secs:45,t:"Menu Sweep",d:"Forty-five seconds. Fifteen things you can buy to eat in this park.",a:""},
+{c:"RAPID",k:"timed",v:30,secs:60,t:"Guest List",d:"Sixty seconds. Every couple you both know, by name. Twelve or better.",a:""},
 {c:"RAPID",k:"timed",v:25,secs:45,t:"Name Ten",d:"Ten horror movies between the two of you. Forty-five seconds. No repeats.",a:""},
 {c:"RAPID",k:"timed",v:25,secs:45,t:"Final Girls",d:"Eight horror movie final girls. Trade off, no hesitating.",a:""},
 {c:"RAPID",k:"timed",v:20,secs:30,t:"Berry Menu",d:"Thirty seconds. Six things sold here with boysenberry in them.",a:""},
@@ -200,31 +230,33 @@ var DECK=[
 {c:"RAPID",k:"timed",v:20,secs:60,t:"Line Census",d:"Sixty seconds. Agree on how many people are ahead of you. Within ten of the real count.",a:""},
 
 /* --- COUPLES --- */
+{c:"COUPLES",k:"group",v:20,t:"Who Said It First",d:"Each of you says who said I love you first. Your guy confirms. Both right or nothing.",a:""},
+{c:"COUPLES",k:"group",v:20,t:"Worst Habit",d:"Name your guy\u2019s worst habit to his face. He has to agree it\u2019s the worst one.",a:""},
+{c:"COUPLES",k:"group",v:20,t:"Wallet Check",d:"Name three things in your guy\u2019s wallet right now. He opens it. Two out of three counts.",a:""},
+{c:"COUPLES",k:"group",v:25,t:"The Fire",d:"What would your guy grab first if the house was burning? Call it, then he answers.",a:""},
+{c:"COUPLES",k:"group",v:20,t:"His Order",d:"Recite your guy\u2019s exact drink order. Every modification. He rules on it.",a:""},
+{c:"COUPLES",k:"group",v:25,t:"First Date Fit",d:"Describe what your guy wore on your first date. He confirms or laughs at you.",a:""},
+{c:"COUPLES",k:"group",v:20,t:"Celebrity Crush",d:"Name your guy\u2019s celebrity crush. He has to admit it in front of everybody.",a:""},
+{c:"COUPLES",k:"group",v:25,t:"Last Argument",d:"You and your guy separately name the last thing you argued about. Both couples match, it counts.",a:""},
+{c:"COUPLES",k:"group",v:20,t:"Dream Trip",d:"Name the one trip your guy actually wants to take. Not the one you want.",a:""},
+{c:"COUPLES",k:"group",v:20,t:"Who Says Sorry",d:"Both couples call who apologizes first after a fight. Everyone has to agree.",a:""},
+{c:"COUPLES",k:"group",v:25,t:"His Favorite Thing",d:"Guess what your guy would say is his favorite thing about you. Then he says it.",a:""},
+{c:"COUPLES",k:"group",v:25,t:"Proudest Moment",d:"Name your guy\u2019s proudest moment of the last year. He decides if you got it.",a:""},
+{c:"COUPLES",k:"group",v:20,t:"Better Driver",d:"Each couple votes on who\u2019s the better driver. If a couple disagrees with itself, it\u2019s dead.",a:""},
 {c:"COUPLES",k:"group",v:20,t:"First Impression",d:"Each of you guesses what your guy was actually thinking the first time you met. Both right or nothing.",a:""},
 {c:"COUPLES",k:"group",v:20,t:"Worst Fear",d:"Each of you name the thing in this park your partner is most afraid of. Both have to land it.",a:""},
 {c:"COUPLES",k:"group",v:15,t:"Order For Them",d:"Guess exactly what your partner would order off the next food cart you pass. They rule on it.",a:""},
-{c:"COUPLES",k:"group",v:25,t:"The Story",d:"Both couples tell the story of their first date. If each couple\u2019s two versions match, it counts.",a:""},
 {c:"COUPLES",k:"group",v:20,t:"Screen Time",d:"Name the last thing your partner watched without you. Phones out to verify.",a:""},
 {c:"COUPLES",k:"group",v:20,t:"The Tell",d:"Describe what your partner does right before they get scared. They have to admit whether it\u2019s true.",a:""},
 {c:"COUPLES",k:"group",v:25,t:"Number In Your Head",d:"Both guys secretly pick 1\u201310 for how scared they are right now. Guess your guy\u2019s number within two.",a:""},
-{c:"COUPLES",k:"group",v:20,t:"Would They",d:"Would your partner walk the next maze alone for $500? Call it, then they answer.",a:""},
 {c:"COUPLES",k:"group",v:15,t:"Song One",d:"Name your partner\u2019s most-played song. Check the phone. No arguing with the data.",a:""},
 {c:"COUPLES",k:"group",v:30,t:"Two Truths",d:"Each of you tells two truths and a lie. Your guy has to catch the lie. Both caught or nothing.",a:""},
-{c:"COUPLES",k:"group",v:20,t:"Same Answer",d:"You and your guy get asked the same question out of earshot. Both couples match, it counts.",a:""},
 
 /* --- QUEUE --- */
 {c:"QUEUE",k:"dare",v:20,t:"Slow Dance",d:"Slow dance with your partner right here. No music, full song length, no laughing it off.",a:""},
-{c:"QUEUE",k:"dare",v:25,t:"Say It Loud",d:"Tell the people around you one specific reason you love your partner. Out loud, no mumbling.",a:""},
-{c:"QUEUE",k:"dare",v:30,t:"Ask Again",d:"Re-propose to your partner, right here in this line, in front of everybody.",a:""},
-{c:"QUEUE",k:"dare",v:25,t:"Eight Bars",d:"Sing eight bars of your song to your partner. Audibly.",a:""},
-{c:"QUEUE",k:"dare",v:20,t:"Recreate It",d:"Recreate your wedding photo pose right where you\u2019re standing. Somebody takes it.",a:""},
 {c:"QUEUE",k:"dare",v:15,t:"Trade Jackets",d:"Swap jackets with your partner for the rest of the night. No takebacks.",a:""},
 {c:"QUEUE",k:"dare",v:20,t:"First Date",d:"Reenact one specific moment from your first date. The other couple has to guess what it was.",a:""},
-{c:"QUEUE",k:"dare",v:15,t:"Feed Them",d:"Next thing either of you eats, you feed each other the first bite. In public.",a:""},
 {c:"QUEUE",k:"dare",v:25,t:"Carry Me",d:"Piggyback ride from where you are now to the front of this line.",a:""},
-{c:"QUEUE",k:"dare",v:20,t:"Three Things",d:"Tell your partner three things you\u2019ve never told them. Real ones.",a:""},
-{c:"QUEUE",k:"dare",v:25,t:"Ask the Line",d:"Get a stranger to guess how long you two have been together. Within a year and it counts.",a:""},
-{c:"QUEUE",k:"dare",v:15,t:"Recruit",d:"Get the group behind you to answer one trivia question with you. They have to actually try.",a:""},
 {c:"QUEUE",k:"dare",v:15,t:"Line Intel",d:"Find out from a stranger in this line which maze is the scariest one this year.",a:""},
 {c:"QUEUE",k:"dare",v:10,t:"Name Drop",d:"Learn the first name of somebody waiting near you. Use it in a sentence.",a:""},
 {c:"QUEUE",k:"dare",v:25,t:"Hype Man",d:"Convince the group behind you this is the best maze in the park. Make them believe it.",a:""},
@@ -235,18 +267,15 @@ var DECK=[
 {c:"QUEUE",k:"dare",v:20,t:"Impression",d:"Do an impression of the monster who got you worst so far. The other three have to guess which one.",a:""},
 {c:"QUEUE",k:"dare",v:25,t:"The Pitch",d:"Pitch a brand-new maze concept in thirty seconds. Needs three yeses.",a:""},
 {c:"QUEUE",k:"dare",v:10,t:"Compliment Duty",d:"Give a sincere, specific compliment to somebody in line. Generic doesn\u2019t count.",a:""},
-{c:"QUEUE",k:"dare",v:20,t:"Four Way",d:"Convince the people around you that one of the four of you works here.",a:""},
 
 
 /* --- PAIR UP: who walks the next maze with who --- */
 {c:"PAIR UP",k:"group",v:30,t:"Swap",d:"Next maze: {g1} with {p1}, {p2} with {g2}. Original couples don\u2019t talk until the exit.",a:""},
 {c:"PAIR UP",k:"group",v:25,t:"Girls Only",d:"{p1} and {p2} walk the next maze alone together. {g1} and {g2} wait at the exit and watch you come out.",a:""},
-{c:"PAIR UP",k:"group",v:25,t:"Guys Only",d:"Send {g1} and {g2} in alone. You two wait at the exit and rate their faces out of ten.",a:""},
 {c:"PAIR UP",k:"group",v:35,t:"Blind Date",d:"Swap partners for this line. Before you reach the front, learn three things about each other you didn\u2019t know.",a:""},
 {c:"PAIR UP",k:"group",v:30,t:"Split the Party",d:"Two pairs, separate entries. Meet at the exit. If both pairs name the same worst room, it counts.",a:""},
 {c:"PAIR UP",k:"group",v:20,t:"Trade Phones",d:"Swap phones with the other couple for one full maze. No peeking, no deleting.",a:""},
 {c:"PAIR UP",k:"group",v:35,t:"Bodyguard",d:"Swapped pairs. {g1} and {g2} swap \u2014 each one\u2019s only job is keeping the other\u2019s partner from screaming. Nobody screams, it counts.",a:""},
-{c:"PAIR UP",k:"group",v:25,t:"Reunion",d:"After a swap maze, each of you tells your own partner one genuinely nice thing the other person said about them.",a:""},
 {c:"PAIR UP",k:"group",v:30,t:"The Interview",d:"Swap partners. Each of you gets one question you\u2019ve always wanted to ask the other couple. They have to answer.",a:""},
 {c:"PAIR UP",k:"group",v:20,t:"Four Abreast",d:"All four of you walk the next maze in one row, arms linked. Anybody breaks the chain, it\u2019s dead.",a:""},
 
@@ -281,7 +310,6 @@ var DECK=[
 {c:"HEAD TO HEAD",k:"duel",v:25,t:"Worst Pickup Line",d:"Deliver a pickup line to your own guy. The other couple picks a winner.",a:""},
 {c:"HEAD TO HEAD",k:"duel",v:20,t:"Dance Break",d:"No music, right here in line. Whoever gets more strangers looking wins.",a:""},
 {c:"HEAD TO HEAD",k:"duel",v:25,t:"Sell Him",d:"Sixty seconds each pitching your husband to a stranger like a used car. Stranger picks.",a:""},
-{c:"HEAD TO HEAD",k:"duel",v:20,t:"Fake Argument",d:"Start a loud fake argument with your guy. Whoever gets more concerned looks wins.",a:""},
 {c:"HEAD TO HEAD",k:"duel",v:30,t:"Guess the Year",d:"The guys name a random photo on their phone. First to name the year it was taken wins.",a:""},
 {c:"HEAD TO HEAD",k:"duel",v:20,t:"Thumb War",d:"Best of three. Loser buys the next churro.",a:""},
 {c:"HEAD TO HEAD",k:"duel",v:20,t:"Don\u2019t Blink",d:"Staring contest. First one to blink loses it.",a:""},
@@ -295,6 +323,30 @@ var DECK=[
 {c:"HEAD TO HEAD",k:"duel",v:20,t:"Name More",d:"The guys pick a category. Trade off naming things. First to blank loses.",a:""},
 {c:"HEAD TO HEAD",k:"duel",v:30,t:"Straight Face",d:"The guys have two minutes to make you laugh. Whoever holds out longer takes it.",a:""},
 {c:"HEAD TO HEAD",k:"duel",v:20,t:"Balance the Cup",d:"Balance a drink on the back of your hand. Longest hold wins.",a:""},
+
+/* --- CAMERA: photo and video challenges --- */
+{c:"CAMERA",k:"dare",v:20,t:"Stranger Portrait",d:"Ask a stranger if you can take their portrait. Take a genuinely good one. Show them the result.",a:""},
+{c:"CAMERA",k:"dare",v:25,t:"Crowd Work",d:"Get five strangers into one photo with you. All five in frame, all five willing.",a:""},
+{c:"CAMERA",k:"dare",v:25,t:"Wrong Family",d:"Get a photo with a family of strangers like you\u2019ve always been part of it.",a:""},
+{c:"CAMERA",k:"dare",v:20,t:"Ridiculous Pose",d:"All four of you, one photo, the dumbest pose anybody can come up with. Nobody opts out.",a:""},
+{c:"CAMERA",k:"dare",v:20,t:"Match the Monster",d:"Find a statue, a prop or a monster and recreate its exact pose. Photo, side by side.",a:""},
+{c:"CAMERA",k:"dare",v:25,t:"On the Record",d:"Your impression of whatever got you worst tonight. On video. No second takes.",a:""},
+{c:"CAMERA",k:"dare",v:20,t:"Reaction Cam",d:"Film your partner\u2019s face for the last twenty feet of the next maze exit.",a:""},
+{c:"CAMERA",k:"dare",v:15,t:"Photo Bomb",d:"Get into a stranger\u2019s photo without them noticing. You need proof.",a:""},
+{c:"CAMERA",k:"dare",v:20,t:"Lift and Hold",d:"Pick your partner up and hold it long enough for a clean photo. Blurry doesn\u2019t count.",a:""},
+{c:"CAMERA",k:"group",v:30,t:"Silent Movie",d:"Swap partners. Each new pair films a fifteen-second silent scene of how the real couples met.",a:""},
+{c:"CAMERA",k:"group",v:35,t:"Soap Opera",d:"Swapped pairs. Twenty seconds of the most dramatic breakup scene you can film. Most convincing pair takes it.",a:""},
+{c:"CAMERA",k:"group",v:30,t:"The Trailer",d:"Film a fifteen-second horror trailer starring all four of you. Somebody has to die in it.",a:""},
+{c:"CAMERA",k:"group",v:25,t:"Slow Pan",d:"Everyone freezes in a pose. One long slow pan across all four. Anybody laughs on camera, it\u2019s dead.",a:""},
+{c:"CAMERA",k:"group",v:25,t:"Swap Selfie",d:"{p1} with {g2}, {p2} with {g1}. Take a couples selfie so convincing the real partners rate it out of ten.",a:""},
+{c:"CAMERA",k:"group",v:30,t:"Stunt Double",d:"Swapped pairs film a ten-second fake fight scene. Full sound effects. The guys have to sell it.",a:""},
+
+/* --- LIFTS and physical head-to-heads --- */
+{c:"HEAD TO HEAD",k:"duel",v:30,t:"Pick Him Up",d:"{p1} lifts {g1}, {p2} lifts {g2}. Both feet off the ground, three full seconds. Longest hold takes it.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:35,t:"Swap Lift",d:"Trade guys. {p1} lifts {g2}, {p2} lifts {g1}. Same three seconds. Somebody is filming this.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:25,t:"Carry Off",d:"Piggyback your guy as far down the line as you can get. Whoever covers more ground wins.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:25,t:"Impression, Filmed",d:"Both do the same monster on camera. The guys watch both back and pick a winner.",a:""},
+{c:"HEAD TO HEAD",k:"duel",v:25,t:"Dance Cam",d:"Ten seconds of dancing each, filmed. The other couple picks who committed harder.",a:""},
 
 /* --- ITEMS --- */
 {c:"ITEM",k:"item",v:0,t:"Immunity",d:"Cancels one composure loss, whenever you decide to use it.",a:""},
@@ -318,7 +370,7 @@ function fresh(){
     pot:0, credit:[0,0],
     tokens:6, tokenBonus:15,
     streak:0, best:0, streakBonus:30,
-    hand:[], dbl:false, ins:false,
+    hand:[], dbl:false, ins:false, off:[],
     pending:[],
     mazes:DEFAULT_MAZES.map(function(m){return {name:m,done:false};}),
     mazeWorth:15, clearBonus:75,
@@ -388,7 +440,7 @@ function vDeck(){
 
   if(!cur){
     if(S.streak>0)h+='<div class="streak">'+S.streak+' clean in a row</div>';
-    h+='<div class="h">'+(S.order.length-S.idx)+' cards left</div>';
+    h+='<div class="h">'+activeLeft()+' cards left</div>';
     h+='<button class="btn amber big" data-a="draw">Draw a card</button>';
     if(S.idx>0)h+='<button class="btn ghost" data-a="reshuffle">Reshuffle the deck</button>';
     h+=pendingHTML()+handHTML();
@@ -547,6 +599,40 @@ function vVault(){
   view.innerHTML=h;
 }
 
+/* ---------- DECK BROWSER ---------- */
+var browsing=false, filter="ALL";
+function cats(){
+  var seen=[],i;
+  for(i=0;i<DECK.length;i++) if(seen.indexOf(DECK[i].c)<0) seen.push(DECK[i].c);
+  return seen;
+}
+function vBrowse(){
+  var on=0;DECK.forEach(function(c){if(!isOff(c))on++;});
+  var h='<button class="btn" data-a="backsetup">Back to setup</button>';
+  h+='<div class="h">'+on+' of '+DECK.length+' cards switched on</div>';
+  h+='<div class="chips"><button class="fc'+(filter==="ALL"?" on":"")+'" data-a="filter" data-c="ALL">All '+DECK.length+'</button>';
+  cats().forEach(function(c){
+    var n=0;DECK.forEach(function(x){if(x.c===c)n++;});
+    h+='<button class="fc'+(filter===c?" on":"")+'" data-a="filter" data-c="'+c+'">'+c+' '+n+'</button>';
+  });
+  h+='</div>';
+  if(S.off.length){
+    h+='<div class="h">Switched off \u00B7 '+S.off.length+'</div>';
+    h+='<p class="note" style="user-select:text;-webkit-user-select:text">'+esc(S.off.join(", "))+'</p>';
+    h+='<button class="btn ghost" data-a="allon">Switch everything back on</button>';
+  }
+  DECK.forEach(function(c,i){
+    if(filter!=="ALL"&&c.c!==filter)return;
+    var off=isOff(c);
+    h+='<div class="cr'+(off?" dim":"")+'"><div class="body">';
+    h+='<div class="cm">'+c.c+(c.v?' \u00B7 '+c.v+' PTS':'')+'</div>';
+    h+='<div class="ct">'+esc(c.t)+'</div>';
+    h+='<div class="cd">'+esc(sub(c.d))+'</div></div>';
+    h+='<button class="tg'+(off?"":" on")+'" data-a="toggle" data-i="'+i+'">'+(off?"OFF":"ON")+'</button></div>';
+  });
+  view.innerHTML=h;
+}
+
 /* ---------- SETUP ---------- */
 function vSetup(){
   if(!S.pin){
@@ -563,7 +649,11 @@ function vSetup(){
       '<button class="btn amber big" data-a="unlock">Unlock</button>';
     return;
   }
-  var h='<div class="h">The players</div>';
+  if(browsing)return vBrowse();
+  var onN=0;DECK.forEach(function(c){if(!isOff(c))onN++;});
+  var h='<div class="h">The deck</div>';
+  h+='<button class="btn amber" data-a="browse">Browse and switch cards off \u00B7 '+onN+' on</button>';
+  h+='<div class="h">The players</div>';
   S.players.forEach(function(p,i){
     h+='<div class="row"><div class="cap">'+["One","Two"][i]+'</div><input data-f="player" data-i="'+i+'" value="'+esc(p)+'"></div>';
   });
@@ -594,10 +684,19 @@ function vSetup(){
 /* ============================================================
    ACTIONS
    ============================================================ */
+function isOff(c){return S.off.indexOf(c.t)>=0;}
+function activeLeft(){
+  var n=0;for(var i=S.idx;i<S.order.length;i++){if(!isOff(DECK[S.order[i]]))n++;}
+  return n;
+}
 function draw(){
-  if(S.idx>=S.order.length){S.order=shuffle(DECK.length);S.idx=0;}
-  S.current={card:DECK[S.order[S.idx]],who:null,revealed:false,endsAt:0};
-  S.idx++;save();render();
+  for(var guard=0;guard<DECK.length*3;guard++){
+    if(S.idx>=S.order.length){S.order=shuffle(DECK.length);S.idx=0;}
+    var c=DECK[S.order[S.idx]];S.idx++;
+    if(!isOff(c)){S.current={card:c,who:null,revealed:false,endsAt:0};save();render();return;}
+  }
+  alert("Every card is switched off. Turn some back on in Setup.");
+  save();render();
 }
 function clear(){S.current=null;clearInterval(tickHandle);save();render();}
 function gain(v,i){
@@ -668,7 +767,16 @@ document.addEventListener("click",function(e){
     if(uv===S.pin){unlocked=true;return render();}
     alert("Wrong code.");return;
   }
-  if(a==="lockup"){unlocked=false;return render();}
+  if(a==="allon"){S.off=[];save();return render();}
+  if(a==="browse"){browsing=true;return render();}
+  if(a==="backsetup"){browsing=false;return render();}
+  if(a==="filter"){filter=el.dataset.c;return render();}
+  if(a==="toggle"){
+    var t=DECK[i].t,x=S.off.indexOf(t);
+    if(x>=0)S.off.splice(x,1); else S.off.push(t);
+    save();return render();
+  }
+  if(a==="lockup"){unlocked=false;browsing=false;return render();}
   if(a==="wipe"){
     if(!confirm("Wipe the score, prizes, names and the code?"))return;
     S=fresh();S.order=shuffle(DECK.length);unlocked=false;save();return render();
@@ -694,7 +802,7 @@ document.addEventListener("input",function(e){
 document.getElementById("tabs").addEventListener("click",function(e){
   var b=e.target.closest("button[data-tab]");if(!b)return;
   S.tab=b.dataset.tab;
-  if(S.tab!=="setup")unlocked=false;
+  if(S.tab!=="setup"){unlocked=false;browsing=false;}
   save();render();
 });
 
@@ -703,6 +811,7 @@ Store.get(KEY).then(function(raw){
   if(!S||!S.players||!S.mazes)S=fresh();
   if(!S.pending)S.pending=[];
   if(!S.guys)S.guys=["Danny","Thomas"];
+  if(!S.off)S.off=[];
   if(!S.credit||S.credit.length!==S.players.length)S.credit=S.players.map(function(){return 0;});
   if(!S.order||S.order.length!==DECK.length){S.order=shuffle(DECK.length);S.idx=0;}
   render();
