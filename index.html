@@ -202,6 +202,10 @@ var DECK=[
 {c:"TRIVIA",k:"reveal",v:10,t:"The Statues",d:"Those concrete people sitting on benches around Ghost Town \u2014 who made them?",a:"Claude Bell, park artist from 1947 to 1986. They were modeled on real people."},
 
 /* --- CLOSEST --- */
+{c:"TRIVIA",k:"reveal",v:15,t:"Last Call",d:"Two mazes are running for the final time this year. Name both.",a:"Origins: The Curse of Calico and The Chilling Chambers."},
+{c:"TRIVIA",k:"reveal",v:15,t:"The Cartoonist",d:"One of this year\u2019s new mazes follows a 1930s cartoonist whose drawings come to life when he uses blood as ink. What\u2019s the maze called?",a:"Inked. The cartoonist is Mortimer Morbid."},
+{c:"TRIVIA",k:"reveal",v:10,t:"New Rule",d:"Knott\u2019s added a brand-new rule for the mazes this season. What is it?",a:"No filming inside the mazes."},
+{c:"TRIVIA",k:"reveal",v:20,t:"Ringmaster",d:"Which character from a retired maze now runs the CarnEvil circus?",a:"Mesmer, the hypnotist from Mesmer: Sideshow of the Mind."},
 {c:"CLOSEST",k:"reveal",v:15,t:"First Fright",d:"What year did Knott\u2019s Scary Farm happen for the very first time?",a:"1973. This is the 53rd season."},
 {c:"CLOSEST",k:"reveal",v:10,t:"Price of Entry",d:"1968 was the first year Knott\u2019s charged admission at all. How much?",a:"One dollar."},
 {c:"CLOSEST",k:"reveal",v:15,t:"How Fast",d:"Top speed of GhostRider, in miles per hour.",a:"56 mph."},
@@ -331,7 +335,7 @@ var DECK=[
 {c:"CAMERA",k:"dare",v:20,t:"Ridiculous Pose",d:"All four of you, one photo, the dumbest pose anybody can come up with. Nobody opts out.",a:""},
 {c:"CAMERA",k:"dare",v:20,t:"Match the Monster",d:"Find a statue, a prop or a monster and recreate its exact pose. Photo, side by side.",a:""},
 {c:"CAMERA",k:"dare",v:25,t:"On the Record",d:"Your impression of whatever got you worst tonight. On video. No second takes.",a:""},
-{c:"CAMERA",k:"dare",v:20,t:"Reaction Cam",d:"Film your partner\u2019s face for the last twenty feet of the next maze exit.",a:""},
+{c:"CAMERA",k:"dare",v:20,t:"Reaction Cam",d:"Film your partner\u2019s face the second they walk out of the next maze. No filming inside \u2014 Knott\u2019s banned it this year.",a:""},
 {c:"CAMERA",k:"dare",v:15,t:"Photo Bomb",d:"Get into a stranger\u2019s photo without them noticing. You need proof.",a:""},
 {c:"CAMERA",k:"dare",v:20,t:"Lift and Hold",d:"Pick your partner up and hold it long enough for a clean photo. Blurry doesn\u2019t count.",a:""},
 {c:"CAMERA",k:"group",v:30,t:"Silent Movie",d:"Swap partners. Each new pair films a fifteen-second silent scene of how the real couples met.",a:""},
@@ -355,17 +359,41 @@ var DECK=[
 {c:"ITEM",k:"item",v:0,t:"Insurance",d:"The next card you blow costs the team nothing.",a:""}
 ];
 
-var DEFAULT_MAZES=["Origins: The Curse of Calico","The Depths","Dark Entities","Pumpkin Eater","Wax Works",
-"Room 13","The Chilling Chambers","Trick or Treat","New for 2026 \u2014 Mystery Lodge","New for 2026 \u2014 Xcelerator"];
+var DEFAULT_MAZES=["Inked","Unearthed","Origins: The Curse of Calico","The Chilling Chambers","Widows","Eight Fingers Nine: The Boogeyman","Room 13","Cinema Slasher","Mary: The Haunting of Worth Home","The Zoo"];
 
 /* ============================================================
    STATE
    ============================================================ */
 var S, unlocked=false, tickHandle=null;
 function ALL(){ return (S && S.custom && S.custom.length) ? DECK.concat(S.custom) : DECK; }
+function actors(){ return S.side==="guys" ? S.guys : S.players; }
+function judges(){ return S.side==="guys" ? S.players : S.guys; }
+var SWAP=["pot","credit","tokens","streak","best","hand","dbl","ins","pending","tiers",
+          "ended","order","idx","current","undoSnap","undoLabel"];
+var GUY_TIERS=[
+  {at:400, tease:"Take your shoes off first.",
+   prize:"Cold beer in the fridge and the good jerky."},
+  {at:750, tease:"You still owe us one.",
+   prize:"Breakfast is ordered and paid for. Nobody cooks, nobody drives."},
+  {at:1100, tease:"Clear Sunday afternoon.",
+   prize:"Set this one in Setup \u2014 make it worth chasing."}
+];
+function blankSide(tiers,n){
+  return {pot:0,credit:[0,0],tokens:6,streak:0,best:0,hand:[],dbl:false,ins:false,
+    pending:[],tiers:tiers,ended:false,order:shuffle(n),idx:0,current:null,
+    undoSnap:null,undoLabel:""};
+}
+function switchSide(){
+  var stash={},incoming=S.bench;
+  SWAP.forEach(function(k){stash[k]=S[k];});
+  S.bench=stash;
+  SWAP.forEach(function(k){S[k]=incoming[k];});
+  S.side=(S.side==="guys")?"girls":"guys";
+  clearInterval(tickHandle);save();render();
+}
 function fresh(){
   return {
-    tab:"deck",
+    tab:"deck", side:"girls", bench:null,
     players:["Crystal","Katie"],
     guys:["Danny","Thomas"],
     pot:0, credit:[0,0],
@@ -373,7 +401,7 @@ function fresh(){
     streak:0, best:0, streakBonus:30,
     hand:[], dbl:false, ins:false, off:[], custom:[],
     pending:[],
-    mazes:DEFAULT_MAZES.map(function(m){return {name:m,done:false};}),
+    mazes:DEFAULT_MAZES.map(function(m){return {name:m,done:false};}), mazeYear:"2026-final",
     mazeWorth:15, clearBonus:75,
     order:[], idx:0, current:null, ended:false, pin:"",
     tiers:[
@@ -395,10 +423,24 @@ function mazeCount(){var n=0;S.mazes.forEach(function(m){if(m.done)n++;});return
 function mazePts(){var n=mazeCount(),p=n*S.mazeWorth;if(n===S.mazes.length&&n>0)p+=S.clearBonus;return p;}
 function tokenPts(){return S.tokens*S.tokenBonus;}
 function total(){return S.pot+mazePts()+tokenPts();}
+var FLIP=[["the other woman\u2019s husband","the other guy\u2019s wife"],
+  ["Husband Inventory","Wife Inventory"],["your husbands","your wives"],
+  ["husbands","wives"],["your husband","your wife"],["husband","wife"],["Husband","Wife"],
+  ["your guy\u2019s","your wife\u2019s"],["your own guy","your own wife"],
+  ["Your guy","Your wife"],["your guy","your wife"],["Girls Only","Guys Only"],
+  ["Both guys","Both of them"],["The guys","The girls"],["the guys","the girls"],
+  ["guys","girls"],["the other woman","the other guy"]];
 function sub(x){
-  return String(x)
-    .replace(/\{p1\}/g,S.players[0]).replace(/\{p2\}/g,S.players[1])
-    .replace(/\{g1\}/g,S.guys[0]).replace(/\{g2\}/g,S.guys[1]);
+  var A=actors(),J=judges(),t=String(x)
+    .replace(/\{p1\}/g,A[0]).replace(/\{p2\}/g,A[1])
+    .replace(/\{g1\}/g,J[0]).replace(/\{g2\}/g,J[1]);
+  if(S.side==="guys"){
+    for(var i=0;i<FLIP.length;i++) t=t.split(FLIP[i][0]).join(FLIP[i][1]);
+    t=t.replace(/\bHe\b/g,"She").replace(/\bhe\b/g,"she")
+       .replace(/\bHis\b/g,"Her").replace(/\bhis\b/g,"her")
+       .replace(/\bhim\b/g,"her").replace(/\bHim\b/g,"Her");
+  }
+  return t;
 }
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
 
@@ -419,6 +461,7 @@ function board(){
     nr.textContent=(S.tiers[nx].at-tot)+" to go";
     bar.style.width=Math.max(0,Math.min(100,Math.round((tot-prev)/Math.max(1,S.tiers[nx].at-prev)*100)))+"%";
   }
+  document.getElementById("slabel").textContent=actors()[0]+" & "+actors()[1]+" \u00B7 team total";
   var h="";for(var i=0;i<6;i++)h+='<div class="pip'+(i<S.tokens?" on":"")+'"></div>';
   document.getElementById("pips").innerHTML=h;
 }
@@ -432,7 +475,7 @@ function render(){
 }
 function who(action,label){
   var h='<div class="h">'+label+'</div><div class="quad">';
-  S.players.forEach(function(p,i){
+  actors().forEach(function(p,i){
     h+='<button class="btn amber" data-a="'+action+'" data-i="'+i+'">'+esc(p)+'</button>';
   });
   return h+'</div>';
@@ -443,6 +486,7 @@ function vDeck(){
   var h="",cur=S.current;
 
   if(!cur){
+    h+=undoBtn();
     if(S.streak>0)h+='<div class="streak">'+S.streak+' clean in a row</div>';
     h+='<div class="h">'+activeLeft()+' cards left</div>';
     h+='<button class="btn amber big" data-a="draw">Draw a card</button>';
@@ -454,7 +498,7 @@ function vDeck(){
 
   var c=cur.card,hot=(c.c==="NERVE"),m=S.dbl?2:1;
   h+='<div class="deckcard'+(hot?" hot":"")+'"><div class="stamp">'+c.c+'</div>';
-  h+='<h2>'+esc(c.t)+'</h2><p>'+esc(sub(c.d))+'</p>';
+  h+='<h2>'+esc(sub(c.t))+'</h2><p>'+esc(sub(c.d))+'</p>';
   if(c.v>0)h+='<div class="worth"><b>'+(c.v*m)+'</b><span>points'+(m===2?" \u00B7 doubled":"")+'</span></div>';
   if(cur.revealed&&c.a)h+='<div class="answer"><div class="al">Answer</div><div class="av">'+esc(c.a)+'</div></div>';
   h+='</div>';
@@ -486,7 +530,7 @@ function vDeck(){
   }
   else if(c.k==="duel"){
     h+='<div class="h">Who took it</div><div class="quad">';
-    S.players.forEach(function(p,i){
+    actors().forEach(function(p,i){
       h+='<button class="btn amber" data-a="duelwin" data-i="'+i+'">'+esc(p)+'</button>';
     });
     h+='</div>';
@@ -508,7 +552,7 @@ function vDeck(){
       h+='<button class="btn" data-a="assignboth">Both of them \u00B7 +'+Math.round(c.v*m*1.5)+'</button>';
       h+=vetoBtn()+'<button class="btn ghost" data-a="skip">Skip \u00B7 breaks the streak</button>';
     }else{
-      h+='<div class="h">'+esc(S.players[cur.who])+'</div>';
+      h+='<div class="h">'+esc(actors()[cur.who])+'</div>';
       h+='<button class="btn amber big" data-a="hit">Did it \u00B7 +'+(c.v*m)+'</button>';
       h+='<button class="btn crimson" data-a="miss">Backed out \u00B7 \u2212'+Math.round(c.v*m/2)+'</button>';
       h+='<button class="btn ghost" data-a="unassign">Somebody else takes it</button>';
@@ -535,7 +579,7 @@ function pendingHTML(){
   if(!S.pending.length)return"";
   var h='<div class="h">Open bets \u00B7 settle after the maze</div>';
   S.pending.forEach(function(p,k){
-    h+='<div class="row"><div><div class="lbl">'+esc(p.t)+'</div><div class="sub">'+esc(S.players[p.i])+' \u00B7 '+p.v+' pts</div></div>';
+    h+='<div class="row"><div><div class="lbl">'+esc(p.t)+'</div><div class="sub">'+esc(actors()[p.i])+' \u00B7 '+p.v+' pts</div></div>';
     h+='<button class="chip on" data-a="paid" data-k="'+k+'">PAID</button>';
     h+='<button class="chip no" data-a="lost" data-k="'+k+'">BLEW IT</button></div>';
   });
@@ -552,24 +596,24 @@ function handHTML(){
 
 /* ---------- MAZES ---------- */
 function vMazes(){
-  var h='<div class="h">Passport \u00B7 '+S.mazeWorth+' each, '+S.clearBonus+' if you clear all ten</div>';
+  var h=undoBtn()+'<div class="h">Passport \u00B7 '+S.mazeWorth+' each, '+S.clearBonus+' if you clear all ten</div>';
   S.mazes.forEach(function(m,k){
     h+='<div class="row"><div class="lbl'+(m.done?" done":"")+'">'+esc(m.name)+'</div>';
     h+='<button class="chip'+(m.done?" on":"")+'" data-a="maze" data-k="'+k+'">'+(m.done?"DONE":"MARK")+'</button></div>';
   });
   h+='<div class="h">Standing</div><p class="note">'+mazeCount()+' of '+S.mazes.length+' cleared \u00B7 '+mazePts()+' points</p>';
-  h+='<p class="note" style="margin-top:14px">Knott\u2019s announces the real 2026 lineup on August 18. Rename these in Setup once it drops.</p>';
+  h+='<p class="note" style="margin-top:14px">Final year for Origins: The Curse of Calico and The Chilling Chambers \u2014 don\u2019t skip those two. No filming inside any maze this season.</p>';
   view.innerHTML=h;
 }
 
 /* ---------- NERVE ---------- */
 function vNerve(){
   var h='<div class="h">Composure \u00B7 '+S.tokens+' of 6 left \u00B7 '+tokenPts()+' pts</div>';
-  h+='<p class="note">Six tokens between the two of them. '+esc(S.guys[0])+' or '+esc(S.guys[1])+' burns one any time somebody screams, grabs, or dead-stops in the middle of a room. Whatever survives is worth '+S.tokenBonus+' points apiece \u2014 real money still on the table at 1 a.m.</p>';
-  h+='<button class="btn crimson big" data-a="burn">Burn a token</button>';
+  h+='<p class="note">Six tokens between the two of them. '+esc(judges()[0])+' or '+esc(judges()[1])+' burns one any time somebody screams, grabs, or dead-stops in the middle of a room. Whatever survives is worth '+S.tokenBonus+' points apiece \u2014 real money still on the table at 1 a.m.</p>';
+  h+='<button class="btn crimson big" data-a="burn">Burn a token</button>'+undoBtn();
   h+='<button class="btn" data-a="restore">Give one back</button>';
   h+='<div class="h">Who\u2019s carrying</div>';
-  S.players.forEach(function(p,i){
+  actors().forEach(function(p,i){
     h+='<div class="row"><div class="lbl">'+esc(p)+'</div><div class="chip'+(S.credit[i]>0?" on":"")+'">'+S.credit[i]+'</div></div>';
   });
   h+='<p class="note">Bragging rights only. The pot is the pot.</p>';
@@ -631,7 +675,7 @@ function vBrowse(){
     var off=isOff(c);
     h+='<div class="cr'+(off?" dim":"")+'"><div class="body">';
     h+='<div class="cm">'+c.c+(c.v?' \u00B7 '+c.v+' PTS':'')+'</div>';
-    h+='<div class="ct">'+esc(c.t)+'</div>';
+    h+='<div class="ct">'+esc(sub(c.t))+'</div>';
     h+='<div class="cd">'+esc(sub(c.d))+'</div></div>';
     h+='<button class="tg'+(off?"":" on")+'" data-a="toggle" data-i="'+i+'">'+(off?"OFF":"ON")+'</button>';
     if(i>=DECK.length)h+='<button class="tg" data-a="delcard" data-i="'+i+'">DEL</button>';
@@ -681,7 +725,13 @@ function vSetup(){
   if(composing)return vCompose();
   if(browsing)return vBrowse();
   var onN=0;DECK.forEach(function(c){if(!isOff(c))onN++;});
-  var h='<div class="h">The deck</div>';
+  var other=(S.side==="guys"?S.players:S.guys);
+  var h='<div class="h">Whose turn</div>';
+  h+='<p class="note">'+esc(actors()[0])+' and '+esc(actors()[1])+' are playing. '+
+     esc(judges()[0])+' and '+esc(judges()[1])+' are judging.</p>';
+  h+='<button class="btn amber" data-a="switchside">Hand it to '+esc(other[0])+' and '+esc(other[1])+'</button>';
+  h+='<p class="note" style="margin-top:10px">Each pair keeps its own score, composure, deck position and prize boxes. Switching never touches the other side.</p>';
+  h+='<div class="h">The deck</div>';
   h+='<button class="btn amber" data-a="browse">Browse and switch cards off \u00B7 '+onN+' on</button>';
   h+='<div class="h">The players</div>';
   S.players.forEach(function(p,i){
@@ -707,7 +757,12 @@ function vSetup(){
   h+='<div class="h">Danger</div>';
   h+='<button class="btn" data-a="lockup">Lock it back up</button>';
   h+='<button class="btn crimson" data-a="wipe">Wipe everything</button>';
-  h+='<p class="note" style="margin-top:14px">Saves on this phone as you go. No signal needed, which matters \u2014 you won\u2019t have any.</p>';
+  var off=('serviceWorker' in navigator)&&navigator.serviceWorker.controller;
+  h+='<div class="h">Offline</div>';
+  h+='<p class="note" style="color:'+(off?'var(--amber)':'#FF6B85')+';font-weight:700">'+
+     (off?'\u2713 Ready offline. This phone will open the game with no signal.'
+         :'\u2717 Not cached yet. Open the game once with signal, close it, open it again \u2014 then check back here.')+'</p>';
+  h+='<p class="note" style="margin-top:10px">Scores save on this phone as you go.</p>';
   view.innerHTML=h;
 }
 
@@ -742,10 +797,30 @@ function lose(v){
   S.streak=0;S.dbl=false;
 }
 
+var UNDOABLE={hit:1,miss:1,duelwin:1,assignboth:1,paid:1,lost:1,burn:1,restore:1,maze:1,
+  item:1,use:1,bet:1,betall:1,veto:1,skip:1};
+var UNDO_WORDS={burn:"burned token",restore:"restored token",maze:"maze mark",
+  paid:"bet paid",lost:"bet lost",use:"item used"};
+function undoBtn(){
+  if(!S.undoSnap)return"";
+  return '<button class="btn ghost" data-a="undo" style="border:1px dashed var(--hair);margin-top:14px">\u21B6 Undo \u00B7 '+esc(S.undoLabel||"last tap")+'</button>';
+}
 document.addEventListener("click",function(e){
   var el=e.target.closest("[data-a]");if(!el)return;
   var a=el.dataset.a,i=+el.dataset.i,k=+el.dataset.k;
   var cur=S.current,c=cur?cur.card:null,m=S.dbl?2:1;
+
+  if(a==="undo"){
+    if(!S.undoSnap)return;
+    var keepTab=S.tab;
+    S=JSON.parse(S.undoSnap);S.tab=keepTab;S.undoSnap=null;S.undoLabel="";
+    clearInterval(tickHandle);save();return render();
+  }
+  if(UNDOABLE[a]){
+    var snap=JSON.parse(JSON.stringify(S));delete snap.undoSnap;delete snap.undoLabel;
+    S.undoSnap=JSON.stringify(snap);
+    S.undoLabel=UNDO_WORDS[a]||(c?c.t:"last tap");
+  }
 
   if(a==="draw")return draw();
   if(a==="reshuffle"){S.order=shuffle(ALL().length);S.idx=0;save();return render();}
@@ -764,7 +839,7 @@ document.addEventListener("click",function(e){
   if(a==="miss"){lose(Math.round(c.v*m/2));return clear();}
 
   if(a==="bet"){S.pending.push({t:c.t,v:c.v*m,i:i});S.dbl=false;return clear();}
-  if(a==="betall"){S.players.forEach(function(p,x){S.pending.push({t:c.t,v:c.v*m,i:x});});S.dbl=false;return clear();}
+  if(a==="betall"){actors().forEach(function(p,x){S.pending.push({t:c.t,v:c.v*m,i:x});});S.dbl=false;return clear();}
   if(a==="paid"){var pd=S.pending[k];gain(pd.v,pd.i);S.pending.splice(k,1);save();return render();}
   if(a==="lost"){var pl=S.pending[k];lose(Math.round(pl.v/2));S.pending.splice(k,1);save();return render();}
 
@@ -827,6 +902,7 @@ document.addEventListener("click",function(e){
     if(x>=0)S.off.splice(x,1); else S.off.push(t);
     save();return render();
   }
+  if(a==="switchside"){browsing=false;composing=false;return switchSide();}
   if(a==="lockup"){unlocked=false;browsing=false;composing=false;return render();}
   if(a==="wipe"){
     if(!confirm("Wipe the score, prizes, names and the code?"))return;
@@ -865,9 +941,22 @@ Store.get(KEY).then(function(raw){
   if(!S.off)S.off=[];
   if(!S.credit||S.credit.length!==S.players.length)S.credit=S.players.map(function(){return 0;});
   if(!S.custom)S.custom=[];
+  if(S.mazeYear!=="2026-final"){
+    S.mazes=DEFAULT_MAZES.map(function(m){return {name:m,done:false};});
+    S.mazeYear="2026-final";
+  }
+  if(!S.side)S.side="girls";
   if(!S.order||S.order.length!==ALL().length){S.order=shuffle(ALL().length);S.idx=0;}
+  if(!S.bench)S.bench=blankSide(GUY_TIERS,ALL().length);
+  if(!S.bench.order||S.bench.order.length!==ALL().length){
+    S.bench.order=shuffle(ALL().length);S.bench.idx=0;}
   render();
 }).catch(function(){S=fresh();S.order=shuffle(ALL().length);render();});
+if('serviceWorker' in navigator && location.protocol==='https:'){
+  window.addEventListener('load',function(){
+    try{navigator.serviceWorker.register('./sw.js').catch(function(){});}catch(e){}
+  });
+}
 </script>
 </body>
 </html>
