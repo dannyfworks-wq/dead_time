@@ -32,8 +32,23 @@ input{font-family:inherit;font-size:16px;color:inherit;}
   background:linear-gradient(180deg,#100E14,#0A090C);position:sticky;top:0;z-index:20;}
 #score{font-family:var(--mono);font-size:52px;font-weight:700;line-height:.9;letter-spacing:-.045em;
   text-align:center;color:var(--amber);}
-#slabel{text-align:center;font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:var(--muted);
-  font-weight:800;margin-top:7px;}
+#slabel{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;}
+#slabel .tn{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--amber);
+  font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#slabel .sw{flex:none;padding:7px 12px;border-radius:20px;border:1px solid var(--hair);
+  background:var(--card);font-size:10px;font-weight:800;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted);}
+#slabel .sw b{color:var(--bone);font-weight:800;}
+.vs2{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;
+  border:1px solid var(--hair);border-radius:14px;padding:16px;background:var(--card);margin-bottom:12px;}
+.vs2 .sd{min-width:0;}
+.vs2 .sd.r{text-align:right;}
+.vs2 .nm2{font-size:10px;letter-spacing:.14em;text-transform:uppercase;font-weight:800;
+  color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vs2 .pt2{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:-.03em;line-height:1.1;}
+.vs2 .lead .pt2{color:var(--amber);}
+.vs2 .mid{font-size:10px;letter-spacing:.2em;color:var(--muted);font-weight:800;}
+.vs2 .tiny{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:800;margin-top:3px;}
 #next{display:flex;justify-content:space-between;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
   font-weight:800;color:var(--muted);margin-top:13px;}
 #nbar{height:5px;border-radius:3px;background:var(--hair);overflow:hidden;margin-top:6px;}
@@ -152,7 +167,7 @@ input{font-family:inherit;font-size:16px;color:inherit;}
 <div id="app">
   <div id="board">
     <div id="score">0</div>
-    <div id="slabel">Team total</div>
+    <div id="slabel"></div>
     <div id="next"><span id="nl">Tier 1</span><span id="nr">250 to go</span></div>
     <div id="nbar"><i style="width:0%"></i></div>
     <div id="pips"></div>
@@ -366,6 +381,18 @@ var DEFAULT_MAZES=["Inked","Unearthed","Origins: The Curse of Calico","The Chill
    ============================================================ */
 var S, unlocked=false, tickHandle=null;
 function ALL(){ return (S && S.custom && S.custom.length) ? DECK.concat(S.custom) : DECK; }
+function sideIdx(){ return S.side==="guys" ? 1 : 0; }
+function teamName(i){ return (S.teams&&S.teams[i])||(i?"Team Two":"Team One"); }
+function benchTotal(){
+  if(!S.bench) return 0;
+  return S.bench.pot + mazePts() + (S.bench.tokens||0)*S.tokenBonus;
+}
+function benchTiers(){
+  var t=0,b=S.bench&&S.bench.tiers||[],n=benchTotal();
+  b.forEach(function(x){if(n>=x.at)t++;});
+  return t;
+}
+function myTiers(){ var t=0,n=total(); S.tiers.forEach(function(x){if(n>=x.at)t++;}); return t; }
 function actors(){ return S.side==="guys" ? S.guys : S.players; }
 function judges(){ return S.side==="guys" ? S.players : S.guys; }
 var SWAP=["pot","credit","tokens","streak","best","hand","dbl","ins","pending","tiers",
@@ -393,7 +420,7 @@ function switchSide(){
 }
 function fresh(){
   return {
-    tab:"deck", side:"girls", bench:null,
+    tab:"deck", side:"girls", bench:null, teams:["Calico Queens","Boot Hill Boys"],
     players:["Crystal","Katie"],
     guys:["Danny","Thomas"],
     pot:0, credit:[0,0],
@@ -461,7 +488,10 @@ function board(){
     nr.textContent=(S.tiers[nx].at-tot)+" to go";
     bar.style.width=Math.max(0,Math.min(100,Math.round((tot-prev)/Math.max(1,S.tiers[nx].at-prev)*100)))+"%";
   }
-  document.getElementById("slabel").textContent=actors()[0]+" & "+actors()[1]+" \u00B7 team total";
+  var me=sideIdx(), them=me?0:1;
+  document.getElementById("slabel").innerHTML=
+    '<span class="tn">'+esc(teamName(me))+'</span>'+
+    '<button class="sw" data-a="switchteam">'+esc(teamName(them))+' <b>'+benchTotal()+'</b> \u2192</button>';
   var h="";for(var i=0;i<6;i++)h+='<div class="pip'+(i<S.tokens?" on":"")+'"></div>';
   document.getElementById("pips").innerHTML=h;
 }
@@ -486,7 +516,7 @@ function vDeck(){
   var h="",cur=S.current;
 
   if(!cur){
-    h+=undoBtn();
+    h+=standings()+undoBtn();
     if(S.streak>0)h+='<div class="streak">'+S.streak+' clean in a row</div>';
     h+='<div class="h">'+activeLeft()+' cards left</div>';
     h+='<button class="btn amber big" data-a="draw">Draw a card</button>';
@@ -622,8 +652,18 @@ function vNerve(){
 }
 
 /* ---------- VAULT ---------- */
+function standings(){
+  var me=sideIdx(),them=me?0:1,a=total(),b=benchTotal();
+  var h='<div class="vs2">';
+  h+='<div class="sd'+(a>=b?" lead":"")+'"><div class="nm2">'+esc(teamName(me))+'</div>'+
+     '<div class="pt2">'+a+'</div><div class="tiny">'+myTiers()+' of 3 boxes</div></div>';
+  h+='<div class="mid">VS</div>';
+  h+='<div class="sd r'+(b>a?" lead":"")+'"><div class="nm2">'+esc(teamName(them))+'</div>'+
+     '<div class="pt2">'+b+'</div><div class="tiny">'+benchTiers()+' of 3 boxes</div></div>';
+  return h+'</div>';
+}
 function vVault(){
-  var tot=total(),h="",cleared=0;
+  var tot=total(),h=standings(),cleared=0;
   S.tiers.forEach(function(t){if(tot>=t.at)cleared++;});
   if(S.ended){
     h+='<div class="tot"><div class="n">'+tot+'</div><div class="l">'+
@@ -726,7 +766,10 @@ function vSetup(){
   if(browsing)return vBrowse();
   var onN=0;DECK.forEach(function(c){if(!isOff(c))onN++;});
   var other=(S.side==="guys"?S.players:S.guys);
-  var h='<div class="h">Whose turn</div>';
+  var h='<div class="h">Team names</div>';
+  h+='<div class="row"><div class="cap">'+esc(S.players[0])+' &amp; '+esc(S.players[1])+'</div><input data-f="team" data-i="0" value="'+esc(teamName(0))+'"></div>';
+  h+='<div class="row"><div class="cap">'+esc(S.guys[0])+' &amp; '+esc(S.guys[1])+'</div><input data-f="team" data-i="1" value="'+esc(teamName(1))+'"></div>';
+  h+='<div class="h">Whose turn</div>';
   h+='<p class="note">'+esc(actors()[0])+' and '+esc(actors()[1])+' are playing. '+
      esc(judges()[0])+' and '+esc(judges()[1])+' are judging.</p>';
   h+='<button class="btn amber" data-a="switchside">Hand it to '+esc(other[0])+' and '+esc(other[1])+'</button>';
@@ -810,6 +853,11 @@ document.addEventListener("click",function(e){
   var a=el.dataset.a,i=+el.dataset.i,k=+el.dataset.k;
   var cur=S.current,c=cur?cur.card:null,m=S.dbl?2:1;
 
+  if(a==="switchteam"){
+    var them=sideIdx()?0:1;
+    if(!confirm("Hand the game to "+teamName(them)+"?\n\n"+teamName(sideIdx())+" keeps everything \u2014 score, tokens, bets, deck position."))return;
+    return switchSide();
+  }
   if(a==="undo"){
     if(!S.undoSnap)return;
     var keepTab=S.tab;
@@ -914,6 +962,7 @@ document.addEventListener("input",function(e){
   var el=e.target,f=el.dataset.f;if(!f)return;
   var i=+el.dataset.i,k=+el.dataset.k,v=el.value;
   if(f==="player")S.players[i]=v;
+  if(f==="team"){S.teams[i]=v;board();}
   if(f==="guy")S.guys[i]=v;
   if(f==="tease")S.tiers[k].tease=v;
   if(f==="prize")S.tiers[k].prize=v;
@@ -946,6 +995,7 @@ Store.get(KEY).then(function(raw){
     S.mazeYear="2026-final";
   }
   if(!S.side)S.side="girls";
+  if(!S.teams)S.teams=["Calico Queens","Boot Hill Boys"];
   if(!S.order||S.order.length!==ALL().length){S.order=shuffle(ALL().length);S.idx=0;}
   if(!S.bench)S.bench=blankSide(GUY_TIERS,ALL().length);
   if(!S.bench.order||S.bench.order.length!==ALL().length){
